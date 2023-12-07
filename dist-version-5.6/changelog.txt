@@ -1,0 +1,67 @@
+Changes:
+December 1 2017
+v5.6
+
+Editor:
+	Lines longer than max characters not having any space
+	were incorrectly split. Fixed.
+	Now splitting is done at any (viable)punctuation,
+	loosing that character.
+	Also a alert is displayed.
+	KIT: field 'split lines' should have been TOUCHEXIT. Fixed.
+	Pure C (standard) ispunct is a nonsense function.
+	New function is_punct in common/aaaa_lib.c
+	moved functions is_alpha and is_alnum to aaaa_lib as well.
+	This kind of split is not considered a change, however:
+	when the file is saved, the new state of the lines is saved
+	as well.
+	Beware!! including the character loss when not corrected.
+Compiler:
+	Flag missing initializers. (also missing in HCC :-)
+	Fixed message [2]arg nil.
+	  (happened with propagated assignments involving bit fields.
+	   e.g. a.x=b.y=z where x or y are bit fields.)
+	Generic list routines in its own file and header
+	(list.c, list.h)
+	Fixed 'warn .. r1 in use' for ^ operator (exclusive or).
+	A little bit of cleanup.
+Linker:
+	No of files reported 1 too many. Fixed.
+	Matching 8 byte names against longer names
+	  now works both ways.
+Standard library:
+	Fixed wrong declarations of 'struct time' and 'struct date'.
+	math.h : moved prototype of 'atof' to a place where it now
+	is declared for AHCC as well.
+Shell:
+	Improved 'Make All' statistics.
+	Replaced VDI input functions for the mouse (needing physical
+	  workstation handle) by approppriate AES functions.
+	  (notably: vq_mouse, v_hide_c and v_show_c)
+	Thanks to Olivier landemarre for pointing this out.
+	Small improvement in load/saveconfig (aaaa_lib.c).
+Applications: CALC:
+	Small improvement in parser: skip spaces between : and %.
+	Specifying a new filename forces a create.
+	(Non functional menu 'new' removed.)
+	Pure C's scanf has problems with text fields > 31: fixed.
+	exactly 32 not fixed, but avoided (too much uncertainties).
+Shell: ESC in journal, menu Calc (calculator)
+Applications: CALC & TINYCALC:
+	Generalization of the parse routines.
+	Both programs now use the same routines from /common/
+	i.e. F_x.c, F_x.h
+
+	F_x(x, y, text) now can be used as a function of x in programs
+	that display values of x for many x's.
+	i.e. X^2+2*x+1   or (x+1)^2 or x^2+2*x*y+y^2 or (x+y)^2
+	:-)
+
+	CALC must only be compiled by AHCC.
+	Pure C's f get/set pos are a little bit unreliable.
+	TINYCALC is now part of CALC in the AHCC source distribution.
+
+Whole::=
+	replaced any use of .. scanf by appropriate simpler
+	alternatives. Saves about 2.5K
+
