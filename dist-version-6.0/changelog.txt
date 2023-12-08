@@ -1,0 +1,109 @@
+A Home Cooked C compiler:   AHCC   aka  ANSI Sozobon (HCC).
+   
+    AHCC is a Pure C compatible  compiler/assembler for the ATARI ST and its offspring.
+
+Changes:
+	november 27 2020
+	v6.0
+	Compiler:
+		built_in offsetof improved.
+
+		Attempts to generalize expressions involving a constant
+		casted to a pointer to a type.
+		This enables translating the Pure C style offsetof macro.
+		For the time being only the latter ;-).
+
+		New flags word xflgs in NODECOMMON (needed more flags :-/)
+		New flag pasc (for 'pascal' modifier)
+		Pascal modifier implemented as described in the Pure C manual.
+
+		Improvements of the handling of nested projects.
+		When in a nested prpject option .L[-J] is absent, the result
+		will be a executable of which the first input file should be
+		the start up code.
+
+		Fixed a regression since march 2009 concerning absolute
+		indexes other than zero.
+
+		Fixed a terrible bug in send_msg() where a indent counter
+		could be less than zero, where it was checked against non zero.
+			Oeps! :-)
+
+		changed
+		GEMDOS to __GEMDOS__
+		XBIOS  to __XBIOS__
+		BIOS   to __BIOS__
+
+		in trap.h, tos.h
+		making them compiler specific.
+
+		vqt_fontheader in vdi.h:
+		changed void *buf to char *buf
+
+		Now SE_FAKT should compile.
+
+		Start up code is not anymore a special case.
+		It is simply the first input file of the project
+		and should call 'main' in the unixoid way (that is main(argc, argv) ).
+		Removed code handling that special case.
+		AHCC looks for all projects .o input files in the same places
+		as for libraries.
+
+		BTW: AHCC allows you to choose a different name than 'main'
+		with the same purpose. See the KIT's 'name of root function' field.
+
+		The error message 'end of file in comment' now displays
+		the number of the line of the opening comment token.
+
+	Shell:
+		Accept .ovl as a valid output filename extension.
+		Better handling in locating include files
+		in nested projects.
+		Always compile for MC6888x (Line F) because
+		AHCC does not implement s/w floating point.
+		Nested project are now compiled (when needed) in the order
+		represented by the project file in relation to the other
+		input files.
+
+	CALC:
+		Moved the edit object to the top of the window, no more
+		paint errors when size'ing or full'ing
+
+	CALC & function common/F_x.C
+		Unary operator cV. Meaning Cubic root.
+		PE:
+		cV 27      yields 3
+		cV 125     yields 5
+		cV 1953125 yields 125
+
+	General:
+		All windows:
+			Open a virtual VDI workstation per window and use that.
+
+		This distribution does not hold anymore any Pure C produced
+		binaries. All binaries (including libraries) are produced by
+		the appropriate AHCC incarnation.
+
+	Not for the public, but mainly for myself. HR.
+		Editor:
+			'Compare 2' treats consecutive empty lines
+			as 1 line.
+
+			So:
+			any consecutive number of empty lines in 1 file
+			is the same as
+			any consecutive number of empty lines in the other file
+			in the same relative position within both files.
+			:-)
+
+		All windows: abolished right and down margins.
+			These are not very neat or useful with sizeable windows.
+
+		Compiler:
+			Abolish pragmat noregs
+			Replace pragmat new_peep by nopeep for suppressing
+			  both registerization and all optimizations.
+			Tested by a seperate incarnation of AHCC.
+			Correct line number in error 'no dclarator for ...'.
+			Fixed a memory leak with '-I's.
+			Small fixes in code generation in rare situations.
