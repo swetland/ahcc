@@ -25,6 +25,36 @@
 typedef enum { CURR,FIRST,NEXT,LAST,PRIOR } STMACC;
 typedef enum { SERIAL,CYCLIC } STMFMODE;
 
+typedef long STMNR;
+
+typedef struct
+{
+	STMNR	nr;		/* sequence number (allways first) */
+	char	*text;	/* data pointer    (allways second) */
+	STMNR	un,		/* old sequence number at UNDO point */
+			l;		/* length of info excl terminators */
+	uchar   ty,		/* type of data in s->user (not used yet) */
+			rem,	/* remainder of cell left for ch insertion */
+			flags;	/* misc flags pe, is_modified */
+} XSTM;
+
+typedef struct
+{
+	STMNR	nr;			/* sequence number (allways first) */
+	void *	data;		/* data pointer    (allways second) */
+} WSTM;
+
+typedef struct stmcell
+{
+	struct stmcell *nx;
+	struct stmcell *pr;
+	union
+	{
+		XSTM	txt;
+		WSTM    winfo;
+	} user;
+} STMC;
+
 typedef struct stbase
 {
 	STMC *c;
@@ -74,5 +104,15 @@ void  stmclear  (STMDEF *d);
 #define stmnext(d) ((d).us.n)
 #define stmprior(d) ((d).us.p)
 #define stmget(d,acc) ((d).us.acc)
+
+#define xn  user.txt.nr
+#define xun user.txt.un
+#define xty user.txt.ty
+#define x_l user.txt.l
+#define xrm user.txt.rem
+#define xfg user.txt.flags
+#define xtx user.txt.text
+#define wit user.winfo.data
+
 
 #endif

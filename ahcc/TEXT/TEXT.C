@@ -42,8 +42,6 @@
 #include "text_sel.h"
 #include "editor.h"
 
-void console(char *, ...);
-
 #define TDS 0
 
 M_S tmen={false,false,0,0,0,0,0,0,0,0L,0L};
@@ -102,17 +100,23 @@ short is_bold_word(BOLDCAT *bc, char *s);
 
 #define BOLDCATS 5
 
+global int strtcmp(int a, const char *s1, const char *s2)
+{
+static int tel = 0;
+	alert_text("(%d) SCMP %d", ++tel, a);
+	return strcmp(s1, s2);
+}
+
 static
 BOLDCAT boldcat[BOLDCATS] = {nil};
 static
 short boldcats = 0;
 
-
 static
 StdCompare vgl
 {
 	char **e1 = p1, **e2 = p2;
-	return strcmp(*e1, *e2);
+	return SCMP(99,*e1, *e2);
 }
 
 void read_tags(void)
@@ -154,7 +158,7 @@ void read_tags(void)
 
 			bc->tags = xmalloc((tgs+1)*sizeof(char *), AH_BOLDTAGS);
 			if (bc->tags eq nil)
-				alertm("no boldtags");
+				alert_text("no boldtags");
 			else
 			{
 				short i = 0;
@@ -363,37 +367,38 @@ ANTEVNT text_evm		/* IT *w; bool w_on, short evmask */
 	return evmask;
 }
 
-global		/* also udes by journal.c */
+global		/* also used by journal.c */
 void txt_margin(IT *w,STMC *s,short y)
 {
+	short hl = w->vhl;
 	/* standard */
-	short x = w->wa.x + w->mgw.x mod w->unit.w;
+	short x = w->wa.x + w->mg.w mod w->unit.w;
 
-	/* w->mgw includes the little margin (< w->unit.w) for showchange */
+	/* w->mg includes the little margin (< w->unit.w) for showchange */
 
 	if (showchange and (s->xfg&ISMOD) )
 	{
-		vsf_color(w->hl,1);
-		vsf_interior(w->hl,FIS_PATTERN);
-		vsf_style(w->hl,(s->xfg&ISMAP) ? 6 : 4);
-		pbox(w->hl, w->wa.x,y, x-1,y+w->unit.h-1);
-		vsf_color(w->hl,0);
-		vsf_interior(w->hl,FIS_SOLID);
-		vsf_style(w->hl,0);
+		vsf_color(hl,1);
+		vsf_interior(hl,FIS_PATTERN);
+		vsf_style(hl,(s->xfg&ISMAP) ? 6 : 4);
+		pbox(hl, w->wa.x,y, x-1,y+w->unit.h-1);
+		vsf_color(hl,0);
+		vsf_interior(hl,FIS_SOLID);
+		vsf_style(hl,0);
 	}
 
 #ifdef SCLIN
-	if (w->mgw.x > w->unit.w and w->loc.lnrs)
+	if (w->mg.w > w->unit.w and w->loc.lnrs)
 	{
 		short mw = w->ma.x - (w->unit.w/2),
 		      my = y + w->unit.h - 1;
-		v_gtext(w->hl, x,  y, cbdlu(s->xn, w->den, ' '));	/* line number */
-		line (w->hl, mw, y, mw, my);
+		v_gtext(hl, x,  y, cbdlu(s->xn, w->den, ' '));	/* line number */
+		line (hl, mw, y, mw, my);
 	}
 #endif
 }
 
-/* v_grtext */
+/* v_gtext */
 static
 void rev_txt(BOLDCAT *bc, short hl, short x, short y, short color, char *text)
 {
@@ -429,7 +434,7 @@ BOLDCAT *can_bold(IT *w)
 global
 DISP disp_nosel
 {
-	short hl=w->hl,dum;
+	short hl = w->vhl, dum;
 	bool rest;
 	char tabbed[MAXL+1];
 	short
@@ -490,7 +495,7 @@ DISP disp_line		/*	IT *w,STMC *s,bool hide	*/
 */
 
 {
-	short hl = w->hl,dum;
+	short hl = w->vhl, dum;
 	bool rest;
 	char tabbed[MAXL+1];
 
@@ -643,7 +648,7 @@ LINES text_lines  /* IT *w, short arrow */
 	}
 
 	if ( y < yplush)
-		pbox( w->hl,				/* spacefill rest of window */
+		pbox( w->vhl,				/* spacefill rest of window */
 			w->wa.x,
 			y,
 			xplusw,
@@ -688,7 +693,7 @@ STMC *ins_text(STMACC acc,IT *w,char *text, ...)
 			msgp->xtx=mal;
 			strcpy(mal,mb);
 			msgp->xfg=0;
-			msgp->xl=l;
+			msgp->x_l=l;
 			msgp->xrm=0;
 		}
 
@@ -913,7 +918,7 @@ IT *editor_window(	bool cre, Cstr name, char *info,
 					)
 {
 	IT *w =
-	create_IT	(	cre,		/* incl WIND_CREATE */
+	create_IT	(	cre,		/* true ? incl WIND_CREATE */
 					name,
 					fl,
 					info,
@@ -973,7 +978,9 @@ IT *editor_window(	bool cre, Cstr name, char *info,
 					map,
 					mapl,
 					deskw.unit,
+					0,		/* 07'20 HR v6 */
 					deskw.points,
+					MINMARGIN,
 					txt_margin
                   );
 	if (w)
@@ -994,7 +1001,7 @@ STMC * empty(IT *w)	 /* only 1 empty line */
 {
 	STMC *i = stminsert(w->base,LAST);
 	i->xtx  = "****\r\n\0";
-	i->xl   = 4;
+	i->x_l   = 4;
 	w->view.sz.h = 1;
 	i->xn   = 1;
 	i->xun  = 1;
@@ -1059,17 +1066,18 @@ bool ascii_file(uchar *s, size_t l)
 
 global
 VpW make_lines
+/*  appends naturally to any already existing chain of lines.
+ *	That's what stminsert(..,Last) does.
+ */
 {
 	char *s=w->map, *svs;
 	short svl;
 	char *e=s+w->mapl;
 	STMC *i;
 
-/*	alert_text(" '%s' | mapl = %ld", w->title.t, w->mapl);
-*/	if (abandon_ins) return;
+	if (abandon_ins) return;
 	if (w->loc.split <= 0)
 		w->loc.split = MAXL;
-
 	w->view.sz.h = 0;
 	while (s <= e)		/* make at least 1 empty cell */
 	{
@@ -1084,7 +1092,7 @@ VpW make_lines
 		}
 
 		i->xtx = s;
-		i->xl  = 0;
+		i->x_l  = 0;
 		w->view.sz.h++;
 		i->xn  = w->view.sz.h;
 		i->xun = w->view.sz.h;
@@ -1094,11 +1102,11 @@ VpW make_lines
 		while (     *s ne '\0'
 			    and *s ne '\r'
 			    and *s ne '\n'
-			    and i->xl < w->loc.split
+			    and i->x_l < w->loc.split
 			   )
 		{
 			s++;
-			i->xl++;
+			i->x_l++;
 		}
 
 		if (*s eq 0)		/* allready internally nulled, allow for 2 */
@@ -1137,32 +1145,32 @@ VpW make_lines
 			}
 		othw			/* line too long; find space */
 			svs = s;
-			svl = i->xl;
+			svl = i->x_l;
 
-			while (*s ne ' ' and *s ne '\t' and i->xl > 0)
+			while (*s ne ' ' and *s ne '\t' and i->x_l > 0)
 			{
 				s--;
-				i->xl--;
+				i->x_l--;
 			}
-			if (i->xl eq 0)		/* no space found; try any punctuation */
+			if (i->x_l eq 0)		/* no space found; try any punctuation */
 			{
 				s = svs;
-				i->xl = svl;
-				while(!is_punct(*s) and i->xl > 0)		/*  Pure C ispunct is a nonsense function */
+				i->x_l = svl;
+				while(!is_punct(*s) and i->x_l > 0)		/*  Pure C ispunct is a nonsense function */
 				{
 					s--;
-					i->xl--;
+					i->x_l--;
 				}
-				if (i->xl)
+				if (i->x_l)
 				{
 					uchar c = *s;
-					alert_text("line %ld > max|split at pos %ld|loosing puctuation char '%c'", i->xn, i->xl,c);
+					alert_text("line %ld > max|split at pos %ld|loosing puctuation char '%c'", i->xn, i->x_l,c);
 				}
 			}
-			if (i->xl eq 0)		/* no punctuation found; split at max loosing a char */
+			if (i->x_l eq 0)		/* no punctuation found; split at max loosing a char */
 			{
 				s = svs /*  + w->loc.split */;		/* 09'17 HR: oeps! */
-				i->xl = w->loc.split;
+				i->x_l = w->loc.split;
 				alert_text("line %ld|split at max(%d)|loosing a char", i->xn, w->loc.split);
 			}
 			*s++ = 0;
@@ -1213,7 +1221,7 @@ WINIT txt_winit
 								/* mooi he? */
 	w->frem=wwa;
 
-	w->frem.w=(deskw.unit.w*(deskw.fullw+1))+w->v.w+w->mgw.w;
+	w->frem.w=(deskw.unit.w*(deskw.fullw+1))+w->v.w /*+w->mg.w*/;
 	if (w->frem.w > wwa.w)
 		w->frem.w = wwa.w;
 
@@ -1247,7 +1255,7 @@ IT * create_X(Cstr fn, short fl, void *bitmap, long pl)
 /* create a IT structure not destined for displaying anything */
 {
 	return
-		create_IT(	false,		/* incl WIND_CREATE */
+		create_IT(	false,		/*no WIND_CREATE */
 					fn, fl, nil, nil,
 					0, SRCE,
 					nil, nil, nil, nil,
@@ -1260,7 +1268,10 @@ IT * create_X(Cstr fn, short fl, void *bitmap, long pl)
 					nil, nil, nil, nil, nil,
 					nil, nil, nil, nil,
 					bitmap, pl,
-					deskw.unit, deskw.points,
+					deskw.unit,
+					0,		/* 07'20 HR v6 */
+					deskw.points,
+					0,
 					nil
                   );
  }
@@ -1284,7 +1295,7 @@ IT * open_X(char *fn)
 			w->base=&w->text;
 			make_lines(w);
 		othw
-			alertm("NO IT");
+			alert_text("NO IT");
 		}
 	}
 	else
@@ -1349,8 +1360,7 @@ FOPEN open_text	/* (char *fn, short fl, void *q) */
 #endif
 		if (!w)			/* not cached */
 		{
-			if ( (w=editor_window(
-							true,				/* + window ? */
+			if ( (w=editor_window(true,				/* + window ? */
 							fn ? fn : " no title ",
 							" ",
 							KIND,
@@ -1401,13 +1411,6 @@ FOPEN open_text	/* (char *fn, short fl, void *q) */
 		/* undo buffer */
 		txtfreebase=stminit(&w->undo,txtfreebase,STMMODE,0,STMS, w->title.t);
 		w->old=&w->undo;
-	#if TESTUNDO
-		{			/* uses copy/paste buffer to show the kept lines */
-			IT *bw=get_it(-1,BUFF);
-			bw->old=bw->base;		/* for clear at quit */
-			bw->base=w->old;
-		}
-	#endif
 #endif
 
 #if BOLDTAGS
@@ -1423,7 +1426,7 @@ FOPEN open_text	/* (char *fn, short fl, void *q) */
 		if (pq->loc.lnrs)		/* 06'14 v5.1 */
 		{
 			w->den    = denotation_space(w->view.sz.h, 10);
-			w->mgw.x += (w->den + 1) * w->unit.w;
+			w->mg.w += (w->den + 1) * w->unit.w;
 		}
 #endif
 		open_w(w);	/* put window on screen (includes get_work() & sliders()) */

@@ -82,7 +82,7 @@ void unmark(BP bp)
    when a inst is read and only when a inst is changed.
  */
 
-RMASK scan_live(BP bp, Cstr which, short level);		/* recursion */
+RMASK scan_live(BP bp, short level);		/* recursion */
 
 static
 RMASK scan_refs(BP bp, RMASK live, short level)
@@ -107,7 +107,7 @@ RMASK scan_refs(BP bp, RMASK live, short level)
 				BP rp = getsym(ip->arg->astr);
 				if (rp)
 				{
-					scan_live(rp, rp->name, level+1);
+					scan_live(rp, level+1);
 					live |= rp->live;
 				}
 			}
@@ -134,7 +134,7 @@ RMASK scan_refs(BP bp, RMASK live, short level)
 }
 
 static
-RMASK scan_live(BP bp, Cstr which, short level)	/* 05'16 HR v5.4 returns RMASK for later convenience, not used yet */
+RMASK scan_live(BP bp, short level)	/* 05'16 HR v5.4 returns RMASK for later convenience, not used yet */
 {
 	RMASK live = 0;
 	BP fb, cb;
@@ -153,7 +153,7 @@ RMASK scan_live(BP bp, Cstr which, short level)	/* 05'16 HR v5.4 returns RMASK f
 			if (cb)
 			{
 				if (!marked)
-					scan_live(cb, "cond", level+1);
+					scan_live(cb, level+1);
 #if DBGB
 				send_msg("%d>cond %s(%d)\n", level, cb->name, cb->bn);
 #endif
@@ -163,7 +163,7 @@ RMASK scan_live(BP bp, Cstr which, short level)	/* 05'16 HR v5.4 returns RMASK f
 			if (fb)
 			{
 				if (!marked)
-					scan_live(fb, "fall", level+1);
+					scan_live(fb, level+1);
 #if DBGB
 				send_msg("%d>fall %s(%d)\n", level, fb->name, fb->bn);
 #endif
@@ -190,7 +190,7 @@ static void Mhealth(BP bp)		/* My original health */
 	anywhere_used = 0;
 	anywhere_set  = 0;
 /* console("My health!!!!\n"); */
-	scan_live(bp, "first", 0);
+	scan_live(bp, 0);
 	peep_loops++;
 }
 
@@ -212,7 +212,7 @@ void rhealth(BP bp)
 	unmark(bp);
 	anywhere_used = 0;
 	anywhere_set  = 0;
-	scan_live(bp, "first", 0);
+	scan_live(bp, 0);
 	peep_loops++;
 }
 #endif

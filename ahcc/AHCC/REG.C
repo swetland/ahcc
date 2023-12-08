@@ -70,12 +70,11 @@
 #include "inst.h"
 
 #define debugR (G.xflags['r'-'a'])
-#define error send_msg
+#define error console
 
 #define	ALIASED		0x1	/* offset is aliased with another */
 #define	REFERED		0x2	/* address of the variable was taken */
 #define ARPTR	    0x4	/* pointer to standard area */
-#define UPSDNS		0x8 /* UPS or DNS for scope control */
 
 global
 LOCVAR *locals;
@@ -102,38 +101,42 @@ static
 char *ltypes[] = { "", "FRG", "PTR", "ARD" };
 
 static
-void dump_table(LOCVAR *loc, Cstr txt, short lvl)
+void dump_table(LOCVAR *loc, Cstr txt)
 {
 	char *pclass(short);
 	short lcnt = 0;
-	send_msg("%d>areas, local variables and parameters: %s\n", lvl, txt);
+	console("areas, local variables and parameters: %s\n", txt);
 	while (loc)
 	{
-		send_msg("%d> %-4s, %3ld.%d %2dX v%d(%d/%d)", loc->vreg.l,
+		console(" %-4s, %3ld.%d %2dX v%d(%d/%d)",
 			loc->name ? loc->name : "~~9",
 			loc->loffset,
 			loc->size,
 			loc->ref,
 			loc->vreg.r, loc->vreg.l, loc->vreg.s);
 		if (loc->reg >= 0)
-			send_msg(" reg=%s",preg(loc->reg));
+			console(" reg=%s",preg(loc->reg));
 		if (loc->flags & REFERED)
-			send_msg(" REFERED");
+			console(" REFERED");
 		if (loc->flags & ALIASED)
-			send_msg(" ALIASED");
+			console(" ALIASED");
 		if (loc->type)
-			send_msg("\t%s", ltypes[loc->type-DRG]);
+			console("\t%s", ltypes[loc->type-DRG]);
 		if (loc->flags & ARPTR)
-			send_msg(" AREA %s",
+			console(" AREA %s",
 			pclass(loc->area));
-		send_msg("\n");
+		console("\n");
 /*
 		if (loc->disps)
-			dump_table(loc->disps, txt, lvl + 1);
+		{
+			depth++;
+			dump_table(loc->disps, txt);
+			depth--;
+		}
 */		loc = loc->next;
 		lcnt++;
 	}
-	send_msg("%d>%d found\n", lvl, lcnt);
+	console("%d found\n", lcnt);
 }
 
 /*
@@ -1122,7 +1125,7 @@ void lrewrite(BP bp)
 	fixmove(regi->arg);		/* just fix up the spec in the 'reg' instruction. */
 
 	ci = bp->first;
-	if (ci ne nil and ci->opcode eq REGL)
+	if (ci ne nil and ci->opcode eq RGL)
 	{
 		ci = ci->next;
 		if (ci ne nil and ci->opcode eq LKX)

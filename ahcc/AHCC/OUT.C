@@ -31,8 +31,6 @@
 #include "common/mallocs.h"
 #include "common/amem.h"
 #include "param.h"
-
-#include "io.h"
 #include "gsub.h"
 #include "out.h"
 #include "opt.h"
@@ -318,7 +316,7 @@ void send_lab(short l)
 }
 
 static
-void add_name(NP np)		/* lbl only if within func (G.prtab->level > 1) */
+void add_name(NP np, short w)		/* lbl only if within func (G.prtab->level > 1) */
 {
 	if (np->sc eq K_STATIC and np->lbl)
 		send_lab(np->lbl);
@@ -328,7 +326,11 @@ void add_name(NP np)		/* lbl only if within func (G.prtab->level > 1) */
 		Cstr n = np->name;
 		if (G.x_add_underline)
 			*s++ = UNDERLINE;
-		while (*n) *s++ = *n++;
+		/* 09'19 HR: v6 correct pascal behaviour */
+		if (np->xflgs.f.pasc)
+			while (*n) *s++ = toupper(*n++);
+		else
+			while (*n) *s++ = *n++;
 		out_goes = s;
 	}
 }
@@ -487,6 +489,24 @@ bool willshow(char c)
 }
 
 global
+bool make_out(void)
+{
+#if BIP_ASM
+	if (G.xlang ne 's')
+#endif
+	{
+		G.output       = open_S(G.output_name.s);
+		if (G.output eq nil)
+		{
+			console("Can't open output %s\n", G.output_name);
+			return false;;
+		}
+	}
+
+	return true;
+}
+
+global
 bool out_setup(Cstr s)
 {
 	if (G.output eq nil)	/* anders of stdout, of -o outfn */
@@ -497,14 +517,10 @@ bool out_setup(Cstr s)
 #if BIP_ASM
 		if (G.xlang ne 's')
 #endif
-		{
+{
 			G.output_name = change_suffix(ps.t, ".i");
-			G.output = open_S(G.output_name.s);
-			if (G.output eq nil)
-			{
-				console("Can't open output %s\n", G.output_name.s);
+			if (!make_out())
 				return false;
-			}
 		}
 	}
 
@@ -572,7 +588,7 @@ Cstr class_names[] =
 	"constants",				/* CON_class */
 	"#bss",						/* BSS_class */
 	"#gbss",					/* GBSS_class */
-	"#offs",					/* OFFS_class */
+	"#offsets",					/* OFFS_class */
 	nil
 };
 
@@ -672,10 +688,6 @@ short new_lbl(void)
 	return G.lblnum++;
 }
 
-#if FOR_A
-global
-short new_albl(short which) { return G.lblnum++; }
-#endif
 global
 void out_fbegin(FP pt, TP np)
 {
@@ -693,7 +705,7 @@ void out_fbegin(FP pt, TP np)
 		gp->misc = *(unsigned long *)&pt->maxregs;
 		gp->lbl = pt->lkxl;
 		gp->r1 = FRAMEP;
-		addcode(gp, "\tlkx  \tR1\t#L1"  C(out_fbegin) "\n");
+		addcode(gp, "\tlkx\tR1\t#L1"  C(out_fbegin) "\n");
 		addcode(gp, "\tmms.l\t\tL2\n");
 	}
 }
@@ -708,18 +720,18 @@ static
 void out_rts(TP ptt, short is_cdecl)
 {
 	if (ptt->token eq T_VOID)
-		addcode(gp, "\trtv  \t\t" C(out_rts) "\n");	/* kill all regs */
+		addcode(gp, "\trtv \t\t" C(out_rts) "\n");	/* kill all regs */
 	elif (ptt->token eq REFTO)
 		if (is_cdecl or G.h_cdecl_calling)
 			addcode(gp, "\trtad \t\t" C(out_rts_addr_cdecl) "\n");		/* 09'10 HR: A0 & D0 */
 		else
-			addcode(gp, "\trta  \t\t" C(out_rts_addr) "\n");
+			addcode(gp, "\trta \t\t" C(out_rts_addr) "\n");
 #if FLOAT
 	elif (G.use_FPU and ptt->ty eq ET_R)
-		addcode(gp, "\trtf  \t\t" C(out_rts_real) "\n");
+		addcode(gp, "\trtf \t\t" C(out_rts_real) "\n");
 #endif
 	else
-		addcode(gp, "\trts  \t\t" C(out_rts) "\n");
+		addcode(gp, "\trts \t\t" C(out_rts) "\n");
 }
 
 global
@@ -739,11 +751,11 @@ void out_fret(FP pt, TP xp)
 		addcode(gp, "L1:\n");	/* return label */
 
 		/* pt = G.prtab whose ->type is the return type */
-		gp->cflgs.f.cdec = tp->cflgs.f.cdec;
+		gp->xflgs.f.cdec = tp->xflgs.f.cdec;
 		addcode(gp, "^R\tmmx.l\t\tL3\n");
-		addcode(gp, "\tulx  \tR1\n");
+		addcode(gp, "\tulx \tR1\n");
 
-		out_rts(ptt, tp->cflgs.f.cdec);
+		out_rts(ptt, tp->xflgs.f.cdec);
 	}
 
 	addcode(gp, "#pend\n");
@@ -766,7 +778,7 @@ void out_pret(FP pt, TP tp)
 	}
 
 	if (pt->token eq STMT)
-		addcode(gp, "\tbra  \t\tL1" C(out_stmt) "\n");
+		addcode(gp, "\tbra \t\tL1" C(out_stmt) "\n");
 	else
 		out_rts(ptt, 0);
 
@@ -784,20 +796,6 @@ void def_lbl(short l)
 	outsub(gp, "L1:\n");
 	freenode(gp);
 }
-
-#if FOR_A
-global
-void def_albl(short l, short which)
-{
-	NP gp = gx_node();
-
-	D_(H, "def_albl");
-
-	gp->lbl = l;
-	outsub(gp, "L1:\n");
-	freenode(gp);
-}
-#endif
 
 global
 short loop_lbl(short l)
@@ -865,7 +863,7 @@ TP find_loop_var(Cstr n)
 		while (tp)
 		{
 			if (tp->name)
-				if (strcmp(tp->name, n) eq 0)
+				if (SCMP(301,tp->name, n) eq 0)
 					return tp;
 			tp = tp->next;
 		}
@@ -1291,16 +1289,16 @@ void out_A(NP np, short adj)
 			case TEXT_class:
 				send_out("<%d/%d.%ld>", np->area_info.class, np->area_info.id, np->area_info.disp);
 				char_out('[');
-				add_name(np);
+				add_name(np,1);
 				char_out(']');
 			break;
 			case NO_class:
-				add_name(np);
+				add_name(np,2);
 			break;
 			default:
 				send_out("<%d/%d.%ld>", np->area_info.class, np->area_info.id, np->area_info.disp);
 				char_out('[');
-				add_name(np);
+				add_name(np,3);
 				char_out(']');
 		}
 
@@ -1366,7 +1364,7 @@ void out_A(NP np, short adj)
 				if (np->name)
 				{
 					char_out('[');
-					add_name(np);
+					add_name(np,4);
 					char_out(']');
 				}
 		}
@@ -1676,7 +1674,7 @@ void out_shift(short c, NP np)
 		break;
 	}
 	case 'N':						/* output name */
-		add_name(np);
+		add_name(np,5);
 		break;
 	case 'O':
 		send_out("%d", np->fld.shift);
@@ -1695,7 +1693,7 @@ void out_shift(short c, NP np)
 			for (i = r.a+AREG; i <= ARV_END; i++)
 				m |= RM(i);
 			m |= G.prtab->wregmsk;
-			if (np->cflgs.f.cdec)
+			if (np->xflgs.f.cdec)
 				m |= RM(D2);
 #if REGLIST
 			if (m)
@@ -1703,10 +1701,11 @@ void out_shift(short c, NP np)
 			else
 				send_out("\treg \t\t#0,");
 #else
-			if (m)
-				send_out("\treg \t\t#%ld,", m);
-			else
+/*			if (m)
+*/				send_out("\treg \t\t#%ld,", m);
+/*			else
 				send_out("\treg \t\t#0,");
+*/
 #endif
 			send_lab(G.prtab->mmxl);
 			send_out("\n\tloc \t\t#-%d,", G.prtab->maxlocs);
@@ -1734,14 +1733,12 @@ void out_shift(short c, NP np)
 		break;
 	case 'X':					/* for debugging */
 		char_out(',');
-		if (np->cflgs.f.asm_f)
+		if (np->xflgs.f.asm_f)
 		{
 			send_out("%d", np->area_info.id);
 		othw
-			if (G.pragmats.noregs) char_out('R');
-			else                   char_out('r');
-			if (G.pragmats.new_peep) char_out('N');
-			else                     char_out('n');
+			if (G.pragmats.nopeep) char_out('N');
+			else                   char_out('n');
 		}
 		break;
 	default:

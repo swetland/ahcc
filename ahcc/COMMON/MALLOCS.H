@@ -79,10 +79,10 @@ enum
 	AH_OPEN_C,
 	AH_OPEN_X,
 	AH_CLOAD,
-	
+
 	AH_TEST_SPACE = 150,
-	
-	
+
+
 	AH_OPTDEF = 200,
 	AH_SPAR_FIX,
 	AH_FUSE_NAME_T,
@@ -185,7 +185,8 @@ enum
 	AH_DIG_RAM,
 
 	AH_DIG_GST,
-	
+	AH_SCRAP,
+
 	AH_STM = 700,
 	AH_TENNIS = 800,
 	AH_RSRCGET = 810,

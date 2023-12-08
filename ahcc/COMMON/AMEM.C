@@ -27,8 +27,6 @@
 #include "common/ahcm.h"
 #include "amem.h"
 
-void console(char *, ...);
-
 XA_memory
 	XA_NS_base  = {nil, nil, nil,  16384, 13, 0, 0, 0, nil, nil, "compiler node space"},
 	XA_CC_base  = {nil, nil, nil,  16384, 13, 0, 0, 0, nil, nil, "compiler base"},

@@ -17,7 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* hiaerarch.c			path manipulation suite */
+/* hierarch.c			path manipulation suite */
 
 #define __MINT__
 
@@ -46,6 +46,9 @@ S_path CC_path;
 global
 S_path idir = {""},
        fsel = {"\0_______.___"};
+
+global
+char prg_name[24];
 
 void send_msg(char *text, ...);
 
@@ -466,7 +469,7 @@ bool hn_samedrive(HI_NAME *h1, HI_NAME *h2)
 {
 	if (!(h1->volume and h2->volume))
 		return false;
-	return strcmp(h1->volume->n, h2->volume->n) eq 0;
+	return SCMP(30,h1->volume->n, h2->volume->n) eq 0;
 }
 
 global
@@ -479,7 +482,7 @@ bool hn_samepath(HI_NAME *h1, HI_NAME *h2)
 	p2 = h2->first;
 	while (p1 and p2)
 	{
-		if (strcmp(p1->n, p2->n) ne 0)
+		if (SCMP(31,p1->n, p2->n) ne 0)
 			return false;
 		p1 = p1->next;
 		p2 = p2->next;
@@ -615,16 +618,7 @@ S_path change_suffix(S_path *f, char *suf)		/* suf incl '.' */
 		strupr(pn.s);
 	return pn;
 }
-/*
-global
-S_path selector(S_path *f, char *suf) /*   *.suf   */
-{
-	static S_path pn;
-	char *pt;
 
-	DIRcpy(&pn, f->s);
-}
-*/
 global
 S_path DIR_suffix(MAX_dir p, char *suf)
 {
@@ -736,7 +730,7 @@ char *shchsuf(char *f, char *suf, short all, short key)		/* suf incl '.' */
 }
 
 global
-void init_dir(short GEM)
+void init_dir(short GEM, Cstr pr)
 {
 	drive=Dgetdrv();
 
@@ -745,13 +739,13 @@ void init_dir(short GEM)
 	{
 		char *p;
 
-		DIRcpy(&idir, prg_name);	/* 02'09 As we dont know the path, we cannot know the case */
+		DIRcpy(&idir, pr);	/* 02'09 As we dont know the path, we cannot know the case */
 		DIRcat(&idir, ".PRG");
 		shel_find(idir.s);
 		/* extra check on ':' needed for inconsistent behaviour of shel_find on different AES's (Aranym) */
 		if (*idir.s eq 0 or *(idir.s+1) ne ':')		/* no path */
 		{
-			DIRcpy(&idir, prg_name);
+			DIRcpy(&idir, pr);
 			strlwr(idir.s);
 			DIRcat(&idir, ".prg");
 			shel_find(idir.s);

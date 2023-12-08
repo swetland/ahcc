@@ -25,7 +25,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include "common/hierarch.h"
 #include "common/mallocs.h"
 #include "param.h"
 
@@ -67,6 +66,8 @@ short stack_ob_init[] =
 
 static
 short stack_ob[sizeof(stack_ob_init)/sizeof(short)];
+
+void send_msg(char *text, ...);
 
 global
 short format_error(FLIST *fl, short nr)
@@ -1452,8 +1453,7 @@ bool load_ob(FLIST *fl)
 {
 	if (fl->name)
 	{
-
-		if (strcmp(fl->name, stackname) eq 0)
+		if (SCMP(325, fl->name, stackname) eq 0)
 		{
 			if (stacksize > 0xffffff)
 				stacksize = 0xffffff;
@@ -1468,6 +1468,8 @@ bool load_ob(FLIST *fl)
 
 		if (fl->h)
 		{
+			if (flags.v)
+				send_msg("Loaded '%s'\n", fl->name);
 			if   (fl->h->pc.magic eq PMAGIC)
 				return load_pure(fl);
 #if DR_I

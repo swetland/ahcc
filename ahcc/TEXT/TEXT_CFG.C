@@ -22,7 +22,6 @@
  */
 
 #include <string.h>
-
 #include "common/aaaa_lib.h"
 #include "common/hierarch.h"
 
@@ -35,6 +34,8 @@
 #include "shell/shell.h"
 #endif
 #include "common/wdial.h"
+
+VpV bgld;
 
 /* item & KIT only for buttons */
 global
@@ -307,15 +308,36 @@ void txtkit_fresh(IT *w)	/* w is source data (text window) */
 	wdial_draw(get_it(-1,KIT),DSCBLOK);
 }
 
+#if 0
+#define CC copyconfig
+#else
+global
+OpEntry *CC(OpEntry *tab, void *old, void *new)
+{
+	short l = 1;
+	OpEntry *newtab, *this = tab;
+
+	while(this->s.str[0]) l++, this++;		/* count entries */
+
+	l *= sizeof(OpEntry);
+	newtab = mmalloc(l, "while opening", "not opened", 1000);
+	if (newtab)
+	{
+		memcpy(newtab, tab, l);
+		changeconfig(newtab, old, new);
+	}
+
+	return newtab;
+}
+#endif
+
 global
 bool load_txtconfig(void)
 {
 	KIT_REFS *k = &pkit;
 	FILE *fp;
-
-	deskw.loctab = copyconfig(loctab, &cfg.loc, &deskw.loc);
+	deskw.loctab = CC(loctab, &cfg.loc, &deskw.loc);
 	setfn = dir_plus_name(&ipath, cfgname());
-
 	fp = fopen(setfn.s,"r");
 	if (fp)
 	{

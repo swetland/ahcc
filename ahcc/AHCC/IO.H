@@ -32,7 +32,6 @@ char *	CC_load		(Cstr name, short *fh, long *l, Cstr opm, short key);
 char *	Cload		(Cstr fname, short *fh, long *l, Cstr opm);
 char *	Fload		(Cstr fname, short *fh, long *l, short key);
 CP		load_source_file (Cstr name, short *count);
-AHCOUT *open_S		(Cstr fn);
+AHCOUT *open_S		(Cstr);
 short 	close_S		(AHCOUT *fd);
-void	send_msg	(Cstr text, ...);
 void	console		(Cstr text, ...);

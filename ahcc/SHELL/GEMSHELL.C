@@ -22,7 +22,7 @@
  *  ==========
  */
 
-#include <stdlib.h>				/* for free() */
+#include <stdlib.h>
 #include <ctype.h>
 #include <ext.h>
 
@@ -39,23 +39,25 @@
 #include "sheldefs.h"
 #include "shell.h"
 #include "common/journal.h"
-#include "common/ipff.h"
-#include "common/hierarch.h"
+#if PCNT_SAMPLE
 #include "ahcc/peepstat.h"
+#endif
 #include "common/treeview.h"
 #include "common/files.h"
 
-externOBJECT *Menu;
+extern
+OBJECT *Menu;
 
 /* If the program is started with an argument
 	we want start with that file,
 	not with the initial journal message,
 	so this bool is defined by FILES.C */
-externbool init_open_jrnl;
-externOpEntry shel_tab[];
+extern
+bool init_open_jrnl;
+extern
+OpEntry shel_tab[];
 
-void dial_b2(void);
-void free_cache(void);
+void dial_b2(short hl);
 
 static
 S_path mksel={""};
@@ -66,9 +68,9 @@ COPRMSG shell_msg=
      123456789012345678901234567890123456789012345678901234567890123456789012		*/
 {
 #if FOR_A || LL
-	PRGNAME " v6 (c) 2017 by H. Robbers A'dam.",
+	PRGNAME " v8 (c) 2017 by H. Robbers A'dam.",
 #else
-	"            " PRGNAME " v5.6 = Sozobon ANSI C",
+	"            " PRGNAME " V" CVERSION " = Sozobon ANSI C",
 	"ANSI and GEM integration: (c) 2014 by H. Robbers A'dam.",
     "            Using Harald Siegmunds NKCC.",
 #endif
@@ -109,7 +111,8 @@ extern
 char fkey[];
 extern
 short skl,fls,fds;
-externIT *jrnlwin;
+extern
+IT *jrnlwin;
 
 global
 void find_project(void)
@@ -215,7 +218,7 @@ void pdb_mark(DPP dp, short mark, short fu)
 	}
 }
 
-#ifdef TREEWIN
+/*
 static
 void dp_expand(IT *w)
 {
@@ -239,16 +242,17 @@ MENU_DO do_Dmenu	/* IT *w, ...... */
 		{
 		case DPEXPAND:
 			dp_expand(w);
-		break;;
+		break;
 		case DPOPEN:
 			if (trv_find_sel(w->trv.root))
 				open_text_file(w->trv.txt);
-		break;;
+		break;
 		}
 	}
 	return true;
 }
-
+*/
+#ifdef TREEWIN
 static
 void dp_add(IT *w, NSP np)
 {
@@ -284,7 +288,8 @@ void dp_add(IT *w, NSP np)
 }
 
 SELECT dp_select;
-globalM_S dmen={false,0,0,0,0,0,0,0,nil,nil};
+global
+M_S dmen={false,0,0,0,0,0,0,0,nil,nil};
 typedef short DP_REC(IT *w, DPP this, NSP to, short flag, short lvl);
 DP_REC dp_file, dp_files;  			/* recursion */
 
@@ -382,7 +387,7 @@ DRAW dp_draw
 	trv_draw(w, w->trv.root);
 	y = w->trv.y;
 	if (y < w->wa.y+w->wa.h)
-		gpbox(w->hl,w->wa.x,y,w->wa.w,w->wa.y+w->wa.h-y);
+		gpbox(w->vhl,w->wa.x,y,w->wa.w,w->wa.y+w->wa.h-y);
 }
 
 static
@@ -390,13 +395,20 @@ NSP dp_set_new(IT *w, NSP np, char *nm)
 {
 	if (np and np->f ne EMP)
 	{
+		STMNR l = 0;
 		if (nm)
 			strcpy(nm, np->trv_txt);
 		trv_deselect(w, w->trv.root);
 		np->state |= SELECTED;
+		if (np->ln < w->norm.pos.y)
+			l =  -w->norm.sz.h/2;
+		if (np->ln >= w->norm.pos.y + w->norm.sz.h)
+			l =  w->norm.sz.h/2;
+		w->norm.pos.y  = bounce(w, w->norm.pos.y + l);
 		get_work(w);
-		w->norm.pos.y  = bounce(w,w->norm.pos.y);
 		do_redraw(w, w->wa);
+		if (l)
+			via (w->slider)(w);
 	}
 	return np;
 }
@@ -433,7 +445,7 @@ CLOSED dp_close
 }
 
 static
-KEYBD dp_keybd
+KEYBD dp_keybd		/* IT */
 {
 	short ks = kcode,
 		  kb = ks&0xff;
@@ -464,10 +476,19 @@ KEYBD dp_keybd
 					else
 						cur = dp_set_new(w,cur->n,fn);
 			break;
-			case NK_INS:
+			case NK_HOME:
+				w->norm.pos.y = 1;
+				get_work(w);
+				do_redraw(w, w->wa);
+			break;
 			case NK_UNDO:
-				w->trv.sel = cur;
-				via (w->select)(w);
+				if (cur)
+				{
+					w->trv.sel = nil;
+					trv_deselect(w, cur);
+					get_work(w);
+					do_redraw(w, w->wa);
+				}
 			break;
 		}
 		w->trv.cur = cur;
@@ -504,8 +525,7 @@ IT * dp_tree(struct dep *root, Cstr name, Cstr pname)
 				dp_select,
 				dp_close,
 				dp_keybd,
-				nil,
-				nil,nil, /* do_Dmenu, &dmen, */
+				nil, nil, nil,
 				TRVDEP
 			);
 
@@ -542,10 +562,6 @@ bool do_shell(short mn, short mt)
 					/* if treeviews, delete treeviews; */
 					dp_end();
 					loadmake(f, 0);
-					/* if was treeview, reopen
-					if (tree)
-						dp_reopen(f);
-					*/
 				}
 #else
 				if (f)
@@ -578,7 +594,7 @@ bool do_shell(short mn, short mt)
 				if (fro)
 				{
 					S_path ln = {"exc_name"}, lf;
-					
+
 					HI_NAME *hn = hn_make(fro, nil, 4);
 					if (hn) if (hn->last)
 					{
@@ -692,6 +708,7 @@ bool do_shell(short mn, short mt)
 				{
 					Cstr rnm = get_rootname();
 					DPP start = pdb_find(fun_dependencies, rnm);
+
 					if (start)
 					{
 						start->data->flags |= TRV_IN;
@@ -729,17 +746,17 @@ bool do_shell(short mn, short mt)
 #endif
 			case MNCOMP:
 			{
-				IT *w=get_top_it();
+				IT *w;
+
+				w=get_top_it();
 				if (!w)
 					break;
 #if PCNT_SAMPLE
 				clr_pcnts();
 #endif
 				do_compile(&root_project, w->title.t);
-				free_cache();
 			}
 			break;
-
 #ifdef MNASSEMF
 			case MNASSEMF:
 			{
@@ -754,7 +771,6 @@ bool do_shell(short mn, short mt)
 				clr_pcnts();
 #endif
 				do_compile(&root_project, f);
-				free_cache();
 			}
 			break;
 #endif
@@ -777,22 +793,13 @@ bool do_shell(short mn, short mt)
 				clr_pcnts();
 #endif
 				do_compile(&root_project, f);
-				free_cache();
 			}
 			break;
+#if BIP_LD
 			case MNMAKE:
-#if 0 /* DEBUG */
-				if (!warn_opt())
-#endif
-				{
-#if PCNT_SAMPLE
-					clr_pcnts();
-#endif
-					domake(&root_project, true);
-					free_cache();
-				}
+				domake(&root_project, true);
 			break;
-
+#endif
 			case MNMAKEAL:
 
 #if PCNT_SAMPLE
@@ -805,7 +812,6 @@ bool do_shell(short mn, short mt)
 				SHL_cfg.makes++;
 				CBIN(makes);
 #endif
-				free_cache();
 			break;
 #if BIP_LD
 			case MNLINK:
@@ -820,9 +826,13 @@ bool do_shell(short mn, short mt)
 		case MTDEBUG:
 		switch (mt)
 		{
+			VpV printtoks;
 	#if defined BUGGER && defined CODBG && DEBUG
 			case CODBG:
-				dial_b2();
+				dial_b2(virt_handle);
+			break;
+			case MNTOKS:		/* 12'17 HR */
+				printtoks();
 			break;
 			case DBGTXT:
 				open_text_file("bugflags.txt");
@@ -846,8 +856,6 @@ bool do_shell(short mn, short mt)
 global
 void init_shell(void)
 {
-	gsclip(v_hl,1,scr_grect);
-
 	kit_for_shell();
 	pdb_init();
 	remove_project();

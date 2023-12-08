@@ -66,12 +66,14 @@ IDES * find_ide(char *s)
 
 double shrange(Token o, Token l, Token r)
 {
-	int i, j, lr, rr, lc, rc, step;
+	int i, j, a, lr, rr, lc, rc, step;
+	double low = 0,high = 0;
 	CELLP c;
 
 	l.v = 0.0;
-
+	a = 0;
 	step = abs(o.step);
+
 	if (step eq 0)
 		step = 1;
 
@@ -94,8 +96,36 @@ double shrange(Token o, Token l, Token r)
 			   )
 				if ( (c = pget_c(cell, i, j)) ne nil)
 					if (c->attr eq FORM or c->attr eq VAL)
+					{
+						if (a eq 0)			/* first */
+						{
+							low  = c->val;
+							high = c->val;
+						}
+						if (c->val > high)
+							high = c->val;
+						if (c->val < low)
+							low = c->val;
+						a += 1;
 						l.v += c->val;
+					}
 
+#if AVRG
+	if (o.t eq AVRG and a > 0)
+		return l.v / a;
+#endif
+#if COUNT
+	if (o.t eq COUNT)
+		return a;
+#endif
+#if MAXIM
+	if (o.t eq MAXIM)
+		return high;
+#endif
+#if MINIM
+	if (o.t eq MINIM)
+		return low;
+#endif
 	return l.v;
 }
 
@@ -273,7 +303,7 @@ PARSE_NEXT shnext
 				Cur.col = id->col;
 				Cur.row = id->row;
 				Cur.v = 0;
-				isformula=true;
+				isformula = true;
 			}
 			else
 				Cur = bad_tok("undefined ide");
@@ -351,15 +381,15 @@ double shparse(SH_SHEET c, IDES *ides, char *s, unsigned int *attr)
 	n = F_x(10, 2, s);
 
 	if (Cur.p ne EOLN)		/* other things after what is actually */
-		n=bad_tok("txt");	/* itself a valid expression, */
+		n = bad_tok("txt");	/* itself a valid expression, */
 							/* must be treated as text */
 	if (n.t eq NUM and isformula)
-		*attr=FORM;
+		*attr = FORM;
 	else
 		if (n.t eq NUM)
-			*attr=VAL;
+			*attr = VAL;
 		else
-			*attr=TXT,n.v=0.0;
+			*attr = TXT,n.v = 0.0;
 
 	return n.v;
 }

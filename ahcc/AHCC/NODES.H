@@ -82,11 +82,12 @@ void	putn_lifo	(NP *head, NP np),
 		put_xlist	(XP *list, XP np),
 	    name_to_str	(void *vp, Cstr s),
 		save_name	(void *vp, long l, Cstr s),
+		c_mods		(void *, void *),
 		init_xlist	(XP np[]),
 		init_hlist	(TP np[]);
 void *	init_symtab	(short key);
 short 	new_name	(void *vp, Cstr text, ... );
-TP 		qualify_type(TP, short, short, short);
+TP 		qualify_type(TP, short);
 NP  	make_node	(short, short, long, Cstr);
 NP 		make_lbin	(short tok, Cstr name, NP lp, NP rp);
 NP 		make_rbin	(short tok, Cstr name, NP lp, NP rp);

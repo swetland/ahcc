@@ -20,10 +20,9 @@
 /* 	SHEET.C
  *	=======
  */
-#define TRACE(a) alert_text("-= " #a " =-");
-#define DATES 0
+#define DATES 1
+#define LOTXT 0
 
-#define NC 1
 #define loop_all loop(i, MAXCOLS) loop(j, MAXROWS)
 
 #include <string.h>
@@ -31,8 +30,6 @@
 #include "common/mallocs.h"
 #include "common/aaaa_lib.h"
 #include "common/hierarch.h"
-
-#define FIXPC 0
 
 #include "aaaa.h"
 #include "common/cursor.h"
@@ -70,7 +67,7 @@ TEDINFO *c_str,*ty_str;
 global
 TEDINFO *ed_str,*co_str;
 
-#if DATES
+#ifdef SH_NEW
 TEDINFO *newstr,*updstr;
 #endif
 
@@ -149,7 +146,7 @@ BUTTON sheet_click		/* w,button,kstate,bclicks,mx,my */
 static
 XSELECT sheet_wselect	/* IT *w,CINF *css,CINF *cse, STMNR top, STMNR bot	*/
 {
-	short hl = w->hl;
+	short hl = w->vhl;
 	STMNR sl, el;
 	short
 		sc, ec, si, ei,
@@ -190,9 +187,9 @@ XSELECT sheet_wselect	/* IT *w,CINF *css,CINF *cse, STMNR top, STMNR bot	*/
 	if (ei > hw-1) ei=hw-1,ec=ww;
 
 	px1 = w->ma.x + (sc*w->unit.w)  ;
-	 py1= w->ma.y + (si*w->unit.h)  ;
+	py1 = w->ma.y + (si*w->unit.h)  ;
 	px2 = w->ma.x + (ec*w->unit.w)-1;
-	 py2= w->ma.y + (ei*w->unit.h)-1;
+	py2 = w->ma.y + (ei*w->unit.h)-1;
 
 	/* 02'14 HR select only columns */
 	{
@@ -356,13 +353,13 @@ SHEET_ACT calc_one	/* SH_CELL */
 
 	if (ty)
 		w->wks.ides = store_ide(w->wks.ides, ide, ty, i, j);
-
+/*	why? oh why?
 #if 1			/* N.B.!!!! test parser only */
 	if (c->attr eq FORM)
 #else
 	if (!(c->attr eq VAL and *c->text eq 0))		/* mostly older sheets */
 #endif
-	{
+*/	{
 		if (ty eq LAB)
 			s += strlen(ide) + 2;
 		c->val = shparse(w->wks.tab, w->wks.ides, s, &c->attr);
@@ -376,11 +373,12 @@ static
 OB_PLACE sh_place
 {
 	w->dial.ob->x=w->ma.x-LEFTMARGIN;
-	w->dial.ob->y=w->ma.y+w->ma.h+1;
+	w->dial.ob->y=w->wa.y;
+	w->ma.y = w->wa.y + w->mg.h + w->dial.ob->h;
 	wdial_edob(w,w->dial.edob);
 }
 
-#if DATES
+#ifdef SH_NEW
 static Cstr Nodate = "no date";
 #endif
 
@@ -428,7 +426,7 @@ void disp_edit(IT *w)
 		strcpy(w->wks.edstr,ed_str->text);
 		strcpy(w->wks.costr,co_str->text);
 
-#if DATES
+#ifdef SH_NEW
 		if (c->cre.dd.m)
 			sprintf(newstr->text, "%d/%d/%d",c->cre.dd.d,c->cre.dd.m, c->cre.dd.y +1980);
 		else
@@ -441,7 +439,7 @@ void disp_edit(IT *w)
 	othw
 		*ed_str->text=0;
 		*co_str->text=0;
-#if DATES
+#ifdef SH_NEW
 		*newstr->text=0;
 		*updstr->text=0;
 #endif
@@ -463,31 +461,42 @@ void sh_dcell(IT *w, int i, int j, bool hide)		/* top and j starts at 1 */
 
 	CELLP c;
 
-	c = get_cell(w, i, j);
-
-	if (c)
+	if (i < MAXCOLS and j < MAXROWS)			/* internal check */
 	{
-		switch(c->attr)
-		{
-		case TXT:
-		case FUN:
-			strcpy(s, c->text);
-		esac
-		case VAL:
-			sprintf(s, "%g", c->val);
-			*(s+cm)=0;
-		esac
-		case FORM:
-			sprintf(s, "%g", c->val);
-			*(s+cm) = 0;
-		esac
-		}
+		c = get_cell(w, i, j);
 
-		if (hide)
-			hidem;
-		f_txt(v_hl, x, y, s);
-		if (hide)
-			showm;
+		if (c)
+		{
+			switch(c->attr)
+			{
+			case TXT:
+			case FUN:
+				strsncpy(s, c->text, MAXI);
+			esac
+			case VAL:
+				sprintf(s, "%g", c->val);
+				*(s+cm)=0;
+			esac
+			case FORM:
+				sprintf(s, "%g", c->val);
+				*(s+cm) = 0;
+			esac
+			}
+
+			if (hide)
+			{
+				hidem;
+				cur_off(w);
+			}
+
+			v_gtext(w->vhl, x, y, s);
+
+			if (hide)
+			{
+				showm;
+				cur_on(w);
+			}
+		}
 	}
 }
 
@@ -509,8 +518,6 @@ char * get_name(IT *w, char **p, int *l, int *col, int *row)
 	return nil;		/* none or last */
 
 }
-
-#define An 1
 
 global
 char * dcol(unsigned short n)
@@ -542,66 +549,81 @@ char * drow(unsigned short n)
 	return a+1;
 }
 
+void sh_kolom(IT *w, int i, bool hide)
+{
+	long j;
+
+	for(j = w->norm.pos.y; j < w->norm.pos.y + w->norm.sz.h; j++)
+		sh_dcell(w,i,j,hide);
+}
+
+
+static
+void sh_index(IT *w)	/* MUST be called with apprpriate clipping active! */
+{
+	int i;
+	long j;
+
+	for(i = w->norm.pos.x; i <= w->norm.pos.x + w->norm.sz.w; i++)
+	{
+		if (i < MAXCOLS)
+			v_gtext(w->vhl,
+					w->ma.x + (i - w->norm.pos.x) * w->unit.w,
+					w->wa.y + w->dial.ob->h,
+					cbr(i,DEFCOLW/2-1,' ',LETTERS)
+				 );
+
+		for(j=w->norm.pos.y; j <= w->norm.pos.y+w->norm.sz.h; j++)
+		{
+			if (i eq w->norm.pos.x and j < MAXROWS)
+				v_gtext(w->vhl,
+						w->ma.x - LEFTMARGIN,
+						w->ma.y+(j-w->norm.pos.y)*w->unit.h,
+						cbdu(j+1,2,' ')
+					 );
+		}
+	}
+	line(w->vhl,
+		w->wa.x, w->ma.y-1,
+		w->wa.x+w->wa.w-1,
+		w->ma.y-1
+		);
+	line(w->vhl,
+		w->ma.x-deskw.unit.w/2-1,
+		w->ma.y, w->ma.x-deskw.unit.w/2-1,
+		w->ma.y+w->ma.h-1
+		);
+}
+
 DRAW sh_disp		/*	(IT *w,RECT t2)	*/
 {
-	int i, j;
+	int i;
 
 	hidem;
 	cur_off(w);
 	if (w->wks.editing)
 		wdial_off(w);
 
-	gspbox(v_hl,w->wa);
+	gspbox(w->vhl,w->wa);
 
 	if (w->norm.pos.x + w->norm.sz.w > (w->view.sz.w - 1) )
 		w->norm.pos.x = w->view.sz.w - (w->norm.sz.w - 1);
 
 	for(i = w->norm.pos.x; i < w->norm.pos.x + w->norm.sz.w; i++)
-	{
-		f_txt(v_hl,
-				 w->ma.x + (i - w->norm.pos.x) * w->unit.w,
-				 w->wa.y,
-#if An
-				 cbr(i,DEFCOLW/2-1,' ',LETTERS)
+		if (i ne w->cu.pos.x)
+			sh_kolom(w, i, NO_HIDE);
+
+#if 1
+	vst_effects(w->vhl,1);		/* cursor kolom als laatste (compleet) en bold */
+	sh_kolom(w, w->cu.pos.x, NO_HIDE);
+	vst_effects(w->vhl,0);
 #else
-				 cbdu(i,2,' ')
+	sh_kolom(w, w->cu.pos.x, NO_HIDE);
 #endif
-			 );
 
-		for(j=w->norm.pos.y; j < w->norm.pos.y+w->norm.sz.h; j++)
-		{
-			if (i eq w->norm.pos.x)
-				f_txt(v_hl,w->ma.x - LEFTMARGIN,
-						 w->ma.y+(j-w->norm.pos.y)*w->unit.h,
-#if An
-						 cbdu(j+1,2,' ')
-#else
-						 cbdu(j,2,' ')
-#endif
-					 );
-			sh_dcell(w,i,j,NO_HIDE);
-		}
-	}
-
-	line(v_hl,
-			w->wa.x,
-			w->ma.y-1,
-			w->wa.x+w->wa.w-1,
-			w->ma.y-1);
-	line(v_hl,
-			w->ma.x-deskw.unit.w/2-1,
-			w->ma.y,
-			w->ma.x-deskw.unit.w/2-1,
-			w->ma.y+w->ma.h-1);
-	line(v_hl,
-			w->wa.x,
-			w->ma.y+w->ma.h,
-			w->wa.x+w->wa.w-1,
-			w->ma.y+w->ma.h);
-
+	sh_index(w);
 	disp_edit(w);
-	draw_ob(ed,0,t2,0);
-
+	draw_ob(ed,0,t2);
 	via (w->select)(w);		/* 02/14 HR */
 
 	if (w->wks.editing)
@@ -636,7 +658,7 @@ SHEET_ACT unloadcell		/* void *w, CELLP c */
 {
 	/* uf must be Fopen'ed */
 	fprintf(uf, CELS "=%d/%d,", c->col, c->row);
-#if DATES
+#ifdef SH_NEW
 	if (c->cre.dd.m and c->cre.dd.y ne 5)
 	{
 		fprintf(uf, CRES "=%d,", c->cre.d);
@@ -724,6 +746,7 @@ short cols, rows, colwsize;
 static
 SH_CELL Cur;
 
+
 static
 OpEntry celltab[]=
 {
@@ -734,8 +757,13 @@ OpEntry celltab[]=
 	{"val =%g\n", MAXD, &Cur.val  },
 	{"txt =%s\n", MAXI, &Cur.text },
 	{"com =%s\n", MAXI, &Cur.comm },
+#ifdef SH_NEW
 	{"cre =%d\n", MAXD, &Cur.cre.d},
 	{"upd =%d\n", MAXD, &Cur.upd.d},
+#else
+	{"cre =%d\n", -1, &Cur.cre.d},
+	{"upd =%d\n", -1, &Cur.upd.d},
+#endif
 	{"}      \n"},
 	{"\0"}
 };
@@ -909,14 +937,12 @@ SHEET_ACT clear_one
 			}
 
 			c->val = 0.0;
-#if DATES
 #if V6
 			c->cre.dd.m = 		/* AHCC < v6 problem */
 			c->upd.dd.m = 0;
 #else
 			c->cre.dd.m = 0;
 			c->upd.dd.m = 0;
-#endif
 #endif
 		othw
 			free_cell(w, c);
@@ -972,7 +998,7 @@ bool change_cell(IT *w, CELLP n, int ty, int col, int row, bool new)
 	n->col = col;
 	n->row = row;
 	n->flags = ISMOD;
-#if DATES
+#ifdef SH_NEW
 	n->upd.d = new ? 0 : Tgetdate();
 	if (!n->cre.dd.m) n->cre = n->upd;
 #endif
@@ -1336,7 +1362,7 @@ static
 DEXIT sh_edend
 {
 	SH_CELL n;			/* new cell */
-#if DATES
+#ifdef SH_NEW
 	CELLP   o;			/* old cell */
 #endif
 	double v;
@@ -1353,7 +1379,7 @@ DEXIT sh_edend
 		int ty; char *ide;
 		int col = w->cu.scrx,
 			row = w->cu.pos.y;
-#if DATES
+#ifdef SH_NEW
 		o = get_cell(w,col,row);
 		if (o)
 		{
@@ -1400,7 +1426,7 @@ DEXIT sh_edend
 			strcpy(w->wks.edstr, s);
 			strcpy(w->wks.costr, t);
 
-#if DATES
+#ifdef SH_NEW
 			if (change_cell(w, &n, ty, col, row, o eq nil))
 #else
 			if (change_cell(w, &n, ty, col, row, false))
@@ -1543,14 +1569,15 @@ IT *create_sheetw(
 					nil,
 					mapl,
 					unit,
+					-1,		/* 06'20 HR v6 */
 					deskw.points,
+					MINMARGIN,
 					nil
 				);
 	if (w)
 	{
-		w->mgw.x = LEFTMARGIN+deskw.unit.w/2;
-		w->mgw.y = TOPMARGIN+2;
-		w->mgw.h = ed->h + 2; /* deskw.unit.h+2; */
+		w->mg.w = LEFTMARGIN+deskw.unit.w/2;
+		w->mg.h = TOPMARGIN+2;
 	}
 
 	return w;
@@ -1634,147 +1661,199 @@ unsigned int get_tonl(FILE *fx, char *sto)
 	return l;
 }
 
-#if FIXPC
-static
-void al32(char *opm, FILE *fx)
-{
-	char s[32]; /* fpos_t xp = hp; */
-	hgetpos(fx);
-	fgets(s, 31, fx);
-	alert_text("al32:%s: | '%s'", opm, s);
-	hsetpos(fx);
-}
-#endif
-
 void skip(FILE *fx)
 {
 	char sk[1024];
 	fscanf(fx,"%[^\n]\n",sk);
 }
 
-#if 0
-static char fill[1024] = "";		/* in data */
-#elif 0
-static char fill[1024];				/* in bss */
+unsigned int  after_nl(char *s)
+{
+	unsigned int l = strlen(s);
+	s += l-1;
+	if (*s eq '\n') *s-- = 0;
+	if (*s eq '\r') *s-- = 0;
+	return l;
+}
+
+#if LOTXT
+void load_txt(SH_SHEET t, struct it *w, FILE *fx)
+{
+	SH_CELL c;
+	char r[512];
+	unsigned int l;
+	short col = 0, row = 0;
+
+	def_head(w);
+
+	while (fgets(r, sizeof(r)-9, fx) ne nil )
+	{
+		memset(&c, 0, sizeof(c) );
+		if (row >= MAXROWS)
+		{
+			row = 0;
+			col ++;
+		othw
+			if (col >= MAXCOLS)
+				break;
+		}
+		c.row = row;
+		c.col = col;
+		c.size = after_nl(r);
+		c.attr = TXT;
+		strcpy(c.text, r);
+		if (!new_cell(w, t, &c))
+			break;
+		row++;
+	}
+
+	fclose(fx);
+}
+void load_db(SH_SHEET t, struct it *w, FILE *fx)
+{
+	SH_CELL c;
+	char r[512];
+	unsigned int l;
+	short col = 0, row = 0;
+
+	def_head(w);
+
+	while (fgets(r, sizeof(r)-9, fx) ne nil )
+	{
+		memset(&c, 0, sizeof(c) );
+	}
+
+	fclose(fx);
+}
 #endif
 
-
-void load_sheet(SH_SHEET t, IT *w, FILE *fx)
+void load_sheet(SH_SHEET t, IT *w, FILE *fx, Cstr fn)
 {
 	SH_CELL c;
 	char cellty[128];
-	int scn;
-#if FIXPC
-	char str[32] = "";
+#if LOTXT
+	char r1[MAXI];
 #endif
-	c.col= -1;
+	int scn = -1;
+	c.col = -1;
 	c.row = -1;
 	def_head(w);
 
-	scn = fscanf(fx,"HR95sheet=%d/%d,cws=%d;\n",
-		&w->wks.head.cols,
-		&w->wks.head.rows,
-		&w->wks.head.colwsize	);
-
-	if (scn ne 3)
+#if LOTXT
+	fgets(r1, MAXI - 1, fx);
+	fseek(fx, 0, SEEK_SET);
+	if (strncmp(r1, "DB_HR", 5) eq 0)
 	{
-		/* New format using OpEntry tables */
-		w->wks.Ver = 1;
+		w->wks.Ver = 3;
 		set_V(w);
-		fseek(fx, 0, SEEK_SET);
-		loadconfig(fx, calctab, 0);
-	othw
-		w->wks.Ver = 0;
-		set_V(w);
-		do			/* Old (original) format */
+		load_db(t, w, fx);
+	}
+	else
+#endif
+	{
+		scn = fscanf(fx,"HR95sheet=%d/%d,cws=%d;\n",
+			&w->wks.head.cols,
+			&w->wks.head.rows,
+			&w->wks.head.colwsize	);
+
+		if (scn ne 3)
 		{
-			bool cel;
+#if LOTXT
+			int col = -1;
 
-			memset(&c, 0, sizeof(c) );
-
-/* 09'17 HR: ';' at start of line is comment */
-/* Remember calc's .cal format is entirely text based. */
-			scn = getc(fx);
-
-			if (scn eq ';')
+			scn = fscanf(fx, "cols=%d", &col);
+			if (scn ne 1)
 			{
- 				skip(fx);
-				continue;
-			othw
-				ungetc(scn, fx);	/* there is no fungetc with Pure C */
+				fseek(fx, 0, SEEK_SET);
+				w->wks.Ver = 2;
+				set_V(w);
+				load_txt(t, w, fx);
 			}
-
-#if FIXPC
-			{
-				hgetpos(fx);
-				fgets(str, 31, fx);
-				hsetpos(fx);
-			}
+			else
 #endif
-			scn = fscanf(fx, CELS "=%d/%d,",&c.col,&c.row);
-
-			if (   scn ne 2
-			    or (   c.col < 0
-			        or c.col > MAXCOLS
-			        or c.row < 0
-			        or c.row > MAXROWS
-			       )
-			   )
 			{
-#if FIXPC
-				hsetpos(fx);
-				al32(str, fx);
-#endif
-			    break;
+				/* New format using OpEntry tables */
+				w->wks.Ver = 1;
+				set_V(w);
+				fseek(fx, 0, SEEK_SET);
+				loadconfig(fx, calctab, 0);
 			}
-
-/* newload.h has  #if's */
-
-	#if  DATES
-			hgetpos(fx);
-			scn = fscanf(fx, CRES "=%d," UPDS "=%d,",  &c.cre.d, &c.upd.d);
-
-			if (scn < 2)
+		othw
+			w->wks.Ver = 0;
+			set_V(w);
+			do			/* Old (original) format */
 			{
-				c.cre = defdate();
-				c.upd.d = 0;
-				hsetpos(fx);
-			}
-	#endif
+				memset(&c, 0, sizeof(c) );
 
-			c.cosize = get_str(w, fx, &c, COMS, "[^|]|", c.comm);
+	/* 09'17 HR: ';' at start of line is comment */
+	/* Remember calc's .cal format is entirely text based. */
+				scn = getc(fx);
 
-			scn = fscanf(fx," %[^=]=",cellty);	/* naar get_ty ? */
-
-/* oldload.h has (very old) original load */
-
-			c.attr = get_ty(&c, cellty);
-
-			switch(c.attr)
-			{
-			case TXT:
-				c.size = get_tonl(fx, c.text);
-			break;
-			case VAL:
-				scn = fscanf(fx, VALS "=%lg",&c.val);
-				if (scn > 0)
+				if (scn eq ';')
 				{
-					fscanf(fx,",");
-					c.size = get_str(w, fx, &c, TXTS, "[^\n]\n", c.text);
+	 				skip(fx);
+					continue;
+				othw
+					ungetc(scn, fx);	/* there is no fungetc with Pure C */
 				}
-				else
-					fscanf(fx,"%lg\n",&c.val);
-			break;
-			case FORM:
-				fscanf(fx, VALS "=%lg," FORS "=", &c.val);
-				c.size = get_tonl(fx, c.text);
-			}
 
-			cel = new_cell(w, t, &c);
+				scn = fscanf(fx, CELS "=%d/%d,",&c.col,&c.row);
 
-			if (!cel)
+				if (   scn ne 2
+				    or (   c.col < 0
+				        or c.col > MAXCOLS
+				        or c.row < 0
+				        or c.row > MAXROWS
+				       )
+				   )
+				    break;
+
+	/* newload.h has  #if's */
+
+		#if  DATES
+				hgetpos(fx);
+				scn = fscanf(fx, CRES "=%d," UPDS "=%d,",  &c.cre.d, &c.upd.d);
+
+				if (scn < 2)
+				{
+					c.cre = defdate();
+					c.upd.d = 0;
+					hsetpos(fx);
+				}
+		#endif
+
+				c.cosize = get_str(w, fx, &c, COMS, "[^|]|", c.comm);
+
+				scn = fscanf(fx," %[^=]=",cellty);	/* naar get_ty ? */
+
+	/* oldload.h has (very old) original load */
+
+				c.attr = get_ty(&c, cellty);
+
+				switch(c.attr)
+				{
+				case TXT:
+					c.size = get_tonl(fx, c.text);
 				break;
-		}od
+				case VAL:
+					scn = fscanf(fx, VALS "=%lg",&c.val);
+					if (scn > 0)
+					{
+						fscanf(fx,",");
+						c.size = get_str(w, fx, &c, TXTS, "[^\n]\n", c.text);
+					}
+					else
+						fscanf(fx,"%lg\n",&c.val);
+				break;
+				case FORM:
+					fscanf(fx, VALS "=%lg," FORS "=", &c.val);
+					c.size = get_tonl(fx, c.text);
+				}
+
+				if (!new_cell(w, t, &c))
+					break;
+			}od
+		}
 	}
 
 	fclose(fx);
@@ -1782,9 +1861,9 @@ void load_sheet(SH_SHEET t, IT *w, FILE *fx)
 
 FOPEN open_sheet		/* Cstr fn, short fl, void *q */
 {
+	SH_SHEET t;
 	FILE *fx = nil;
 	IT *w;
-	SH_SHEET t;
 
 	if (!ed)
 		rsrc_gaddr(0,SH_EDOB,&ed);
@@ -1793,7 +1872,7 @@ FOPEN open_sheet		/* Cstr fn, short fl, void *q */
 	ty_str  = get_tedinfo(ed,SH_TYSTR);
 	ed_str  = get_tedinfo(ed,SH_EDSTR);
 	co_str  = get_tedinfo(ed,SH_COSTR);
-#if DATES
+#ifdef SH_NEW
 	newstr  = get_tedinfo(ed,SH_NEW  );
 	updstr  = get_tedinfo(ed,SH_UPD  );
 #endif
@@ -1815,9 +1894,6 @@ FOPEN open_sheet		/* Cstr fn, short fl, void *q */
 		{
 			close_w(w);
 		othw
-			fx = fopen(fn,"r");
-			if (fx)
-				load_sheet(t, w, fx);
 			w->ismod = false;
 			w->view.sz.w = MAXCOLS;
 			w->view.sz.h = MAXROWS;
@@ -1827,6 +1903,11 @@ FOPEN open_sheet		/* Cstr fn, short fl, void *q */
 			w->wks.editing=0;
 			rowspace=fdenotation_space(MAXROWS, 10     );
 			colspace=fdenotation_space(MAXCOLS, LETTERS);
+
+			fx = fopen(fn,"r");
+			if (fx)
+				load_sheet(t, w, fx, fn);
+
 			cur_on(w);			/* because no timer for sheets */
 		}
 	}

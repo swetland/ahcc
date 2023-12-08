@@ -32,11 +32,11 @@
  *	Main routine, options, error handling.
  */
 
+#define WAIT 0
+
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <stdlib.h>
 #include <tos.h>
 #include <ext.h>
 #include <setjmp.h>
@@ -46,7 +46,6 @@
 
 #if BIP_CC
 #include "shell/shell.h"
-#include "common/hierarch.h"
 #include "common/pdb.h"
 #endif
 
@@ -65,9 +64,9 @@
 #define debugD (G.xflags['d'-'a'])
 #define debugZ (G.xflags['z'-'a'])
 
-short alert_text(char *, ...);
-
 enum { dflags = 'z'-'a' };
+
+const char * pluralis(short);
 
 global long	line_no, n_line_no;
 global COMMON G;
@@ -104,9 +103,9 @@ DEFS defines[MAXPREDEF];		/* NN..BB.. There are also in init_cc() for BIP_CC */
 global
 Cstr ahcc_version =
 #if FOR_A || LL
-                    "v6"
+                    "v8"
 #else
-                    "v5.6"
+                    CVERSION
 #endif
       ;
 
@@ -120,21 +119,6 @@ const char
 #endif
 			" %s (c) 1988 by Sozobon, 1990 - present by H.Robbers Amsterdam\n";
 
-
-/*
-global
-bool nomore_warnings(void)
-{
-	return G.nmwarns > G.f_max_warnings;
-}
-
-global
-bool nomore_errors(void)
-{
-	return G.nmerrors > G.e_max_errors
-}
-
-*/
 static
 bool toomanyerr(void)
 {
@@ -161,35 +145,35 @@ bool toomanywarn(void)
 	return false;
 }
 
+/* only called if C_DEBUG, but left in because also usable w/o C_DEBUG */
 global
 void send_incname(short inclvl, Cstr incname)
 {
-	if (G.v_Cverbosity)
-	{
-		Cstr s = incname+strlen(incname);	/* display short name */
-		while (s > incname)
-			if (*s eq bslash or *s eq fslash)
-			{
-				s++;
-				break;
-			}
-			else
-				s--;
-#if BIP_CC
-	#if C_DEBUG
-		send_msg("%d>[%d]%s\n", inclvl, G.inctab->p.fileno, s);
-	#else
-		send_msg("%d>%s\n", inclvl, incname);
-	#endif
-#else
-		console(inclvl ? "\t" : "\n");
-	#if C_DEBUG
-		console("[%d]%s ", G.inctab->p.fileno, s);
-	#else
-		console("%s ", s);
-	#endif
+	Cstr s = incname+strlen(incname);	/* display short name */
+	while (s > incname)
+		if (*s eq bslash or *s eq fslash)
+		{
+			s++;
+			break;
+		}
+		else
+			s--;
+#if 0
+  #if BIP_CC
+    #if C_DEBUG
+    	console("%d>[%d]%s\n", inclvl, G.inctab->p.fileno, s);
+    #else
+    	console("%d>%s\n", inclvl, incname);
+    #endif
+  #else
+  	console(inclvl ? "\t" : "\n");
+    #if C_DEBUG
+      console("[%d]%s ", G.inctab->p.fileno, s);
+    #else
+      console("%s ", s);
+    #endif
+  #endif
 #endif
-	}
 }
 
 global
@@ -248,7 +232,7 @@ void dodefs(void)
 		if (!as)
 			as = "1";
 		if (G.v_Cverbosity > 3)
-			send_msg("def: '%s','%s'\n", s, as);
+			console("def: '%s','%s'\n", s, as);
 
 		optdef(s, as);
 	}
@@ -258,7 +242,7 @@ static
 void optnl(void)
 {
 	if (bugf eq stdout and G.anydebug)
-		send_msg("\n"), breakin++;
+		console("\n"), breakin++;
 }
 
 static
@@ -327,9 +311,8 @@ short do_file(void)
 	MiNT  = get_cookie('MiNT',nil);
 
 #endif
-#if !BIP_CC || !__COLDFIRE__
-	init_dictionary();
-#endif
+
+	init_cache();
 	tok_init();
 
 	deflist = init_symtab(AH_NEW_DEFLIST);
@@ -350,18 +333,6 @@ short do_file(void)
 	}
 #else
 	if (xjmp eq 1) goto cc_abort;
-#endif
-
-/* NB: make_tree needs dictionary and tok_init */
-#if 0 /* MTREE */
-	{
-		NP np, make_tree(Cstr *);
-		char temp[128], *templ = temp;
-
-		sprintf(templ, "%d[%d(%d,%d),%d(%d,%d)]", BINOR, SHR, ID, ICON, SHL, ID, ICON);
-		np = make_tree(&templ);
-		freenode(np);
-	}
 #endif
 
 #if C_DEBUG
@@ -431,7 +402,7 @@ cc_abort:
 	free_dictionary();
 #endif
 
-#if NODESTATS
+#if  0 /* NODESTATS */
 	console("unique id's: %ld\n", dictionary_names);
 	console("heap's     : %ld\n", heap_names);
 #endif
@@ -533,17 +504,17 @@ cc_abort:
 
 	if (xjmp)
 	{
-		send_msg(abort_msg);
-		setup_end();
+		console(abort_msg);
 #if BIP_ASM
 		asmc_end();
 #endif
 		opc_end();
-		free_cache();
 		CC_xfree_all(-1);
 		CC_ffree_all(-1);
 		NS_xfree_all(-1);
 	}
+
+	free_cache();
 
 	if (G.nmerrors)
 		return G.nmerrors;
@@ -579,17 +550,17 @@ void subdef(Cstr s)
 	short i;
 
 	for (i = 0; i < G.npred; i++)
-		if (strcmp(s, defines[i].dname) eq 0)
-			break;
-	if (i < G.npred)		/* 10'12 HR: v4.15 undef name must be there */
-	{
-		while (i < G.npred)
+		if (SCMP(0, s, defines[i].dname) eq 0)
 		{
-			defines[i] = defines[i+1];
-			i++;
+			CC_xfree(defines[i].dname);		/* 01'18 HR: v6 */
+			while (i < G.npred)
+			{
+				defines[i] = defines[i+1];
+				i++;
+			}
+			G.npred--;
+			return;
 		}
-		G.npred--;
-	}
 }
 
 static
@@ -613,70 +584,60 @@ static
 void help_options(char c)
 {
 	if (c)
-		send_msg("\nwarning: unknown option: %c\tthey are:\n\t(followed by current state)\n", c);
-	send_msg("AHCC specific options:\n");
-	send_msg("-*g    warn goto's                         (%s)\n", ON(G.ag_nogoto));
-	send_msg("-*b    no branch reversals                 (%s)\n", ON(G.ab_no_branch_reversals));
-	send_msg("-*i    default int is 32 bits              (%s)\n", ON(G.ai_int32));
-	send_msg("-*w    default Xn is long                  (%s)\n", ON(G.aw_Xnl));
-	send_msg("-*u    Assembly starts in .super mode      (%s)\n", ON(G.au_supervisor));
-	send_msg("\nPure C compatible options:\n");
-	send_msg("-a     strict ANSI                         (%s)\n", ON(G.a_strict_ANSI));
-	send_msg("-b     DRI object output                   (%s)\n", ON(G.b_output_DRI));
-	send_msg("-c     allow nested comments               (%s)\n", ON(G.c_nested_comments));
-	send_msg("-dX..X define macro; optional =value\n");
-	send_msg("-eN    maximum no of erors                 (%d)\n",    G.e_max_errors);
-	send_msg("-fN    maximum no of warnings              (%d)\n",    G.f_max_warnings);
-	send_msg("-g     size optimization                   (%s)\n", ON(G.g_optimum_size));
-	send_msg("-h     cdecl calling                       (%s)\n", ON(G.h_cdecl_calling));
-	send_msg("-iX..X include directory\n");
-	send_msg("-j     no jump optimization                (%s)\n", ON(G.j_no_jump_optimization));
-	send_msg("-k     default char is unsigned            (%s)\n", ON(G.k_char_is_unsigned));
-	send_msg("-l     maximum identifier length           (%d)\n",    G.l_identifier_max_length);
-	send_msg("-m     merge identical strings             (%s)\n", ON(G.m_string_merging));
-	send_msg("-n     'nm' list of symbols                (%s)\n", ON(G.n_nmlist));
-	send_msg("-p     use absolute calls                  (%s)\n", ON(G.p_absolute_calls));
-	send_msg("-s     force frame pointers                (%s)\n", ON(G.s_frame_pointer));
-	send_msg("-t     stack checking                      (%s)\n", ON(G.t_stack_checking));
-	send_msg("-uX..X undefine macro\n");
-	send_msg("-v     verbosity                           (%d)\n",    G.v_Cverbosity);
-	send_msg("-x     prepend underline to identiers      (%s)\n", ON(G.x_add_underline));
+		console("\nwarning: unknown option: %c\tthey are:\n\t(followed by current state)\n", c);
+	console("AHCC specific options:\n");
+	console("-*g    warn goto's                         (%s)\n", ON(G.ag_nogoto));
+	console("-*b    no branch reversals                 (%s)\n", ON(G.ab_no_branch_reversals));
+	console("-*i    default int is 32 bits              (%s)\n", ON(G.ai_int32));
+	console("-*w    default Xn is long                  (%s)\n", ON(G.aw_Xnl));
+	console("-*u    Assembly starts in .super mode      (%s)\n", ON(G.au_supervisor));
+	console("\nPure C compatible options:\n");
+	console("-c     allow nested comments               (%s)\n", ON(G.c_nested_comments));
+	console("-dX..X define macro; optional =value\n");
+	console("-eN    maximum no of erors                 (%d)\n",    G.e_max_errors);
+	console("-fN    maximum no of warnings              (%d)\n",    G.f_max_warnings);
+	console("-h     cdecl calling                       (%s)\n", ON(G.h_cdecl_calling));
+	console("-iX..X include directory\n");
+	console("-k     default char is unsigned            (%s)\n", ON(G.k_char_is_unsigned));
+	console("-l     maximum identifier length           (%d)\n",    G.l_identifier_max_length);
+	console("-uX..X undefine macro\n");
+	console("-v     verbosity                           (%d)\n",    G.v_Cverbosity);
+	console("-x     prepend underline to identiers      (%s)\n", ON(G.x_add_underline));
 #if FLOAT
-	send_msg("-2     generate for MC68020+               (%s)\n", ON(G.i2_68020));
-	send_msg("-3     generate for MC68020+               (%s)\n", ON(G.i2_68020));
-	send_msg("-4     generate for MC68020+               (%s)\n", ON(G.i2_68020));
-	send_msg("-6     generate for MC68020+               (%s)\n", ON(G.i2_68020));
-	send_msg("-8     generate directly for MC68881/2     (%s)\n", ON(G.use_FPU));
+	console("-2     generate for MC68020+               (%s)\n", ON(G.i2_68020));
+	console("-3     generate for MC68030+               (%s)\n", ON(G.i2_68030));
+	console("-4     generate for MC68040+               (%s)\n", ON(G.i2_68040));
+	console("-6     generate for MC68060+               (%s)\n", ON(G.i2_68060));
+	console("-8     generate directly for MC68881/2     (%s)\n", ON(G.use_FPU));
 #endif
 #if COLDFIRE
-	send_msg("-7     Coldfire                            (%s)\n", ON(G.Coldfire));
-	send_msg("-27    Coldfire, also runnable on 68020 (%s,%s)\n", ON(G.Coldfire),ON(G.i2_68020));
+	console("-7     Coldfire                            (%s)\n", ON(G.Coldfire));
+	console("-27    Coldfire, also runnable on 68020 (%s,%s)\n", ON(G.Coldfire),ON(G.i2_68020));
 #endif
 #if C_DEBUG
 #if ! BIP_CC
 	if (!MiNT and !MagX)
 	{
-		send_msg(wacht);
+		console(wacht);
 		bios(2,2);
 	}
 #endif
-	send_msg("debug options:\n");
-	send_msg("-*t    make listing of internal token names and values\n");
-	send_msg("-*e    suppress extracodes (ahcc_rt.h)\n");
-	send_msg("-*a    obey ALL but zZ debug code\n");
-	send_msg("-*z    obey ALL debug code except printnode\n");
-	send_msg("-*y... obey yflagged code (a..z)\n");
-	send_msg("-*x... obey xflagged code (A..Z)\n");
-	send_msg("-*f    debug output to:                    (ahcc.jnl)\n");
-	send_msg("-*l    all kinds of lists in journal       (%s)\n", ON(G.al_list_stats));
-	send_msg("-*d    do newest optimization              (%s)\n", ON(G.ad_new_peep));
-	send_msg("-*n    suppress optimizer & assembler      (%s)\n", ON(G.an_no_O));
-	send_msg("-*r    suppress registerization            (%s)\n", ON(G.ar_no_registerization));
+	console("debug options:\n");
+	console("-*t    make listing of internal token names and values\n");
+	console("-*e    suppress extracodes (ahcc_rt.h)\n");
+	console("-*a    obey ALL but zZ debug code\n");
+	console("-*z    obey ALL debug code except printnode\n");
+	console("-*y... obey yflagged code (a..z)\n");
+	console("-*x... obey xflagged code (A..Z)\n");
+	console("-*f    debug output to:                    (ahcc.jnl)\n");
+	console("-*l    all kinds of lists in journal       (%s)\n", ON(G.al_list_stats));
+	console("-*d    suppress  optimizer                 (%s)\n", ON(G.ad_nopeep));
+	console("-*n    suppress optimizer & assembler      (%s)\n", ON(G.an_no_O));
 #endif
 #if ! BIP_CC
 	if (!MiNT and !MagX)
 	{
-		send_msg(wacht);
+		console(wacht);
 		bios(2,2);
 	}
 #endif
@@ -743,6 +704,9 @@ void newopt(Cstr s)
 		c = tolower(c);
 		switch (c)
 		{
+		case 't':				/* was: no_registerization, now abolished (but see nopeep) */
+		case 'r':				/*  "          "  */
+			return;
 #if DEBUG
 		case 'x':
 			s = setflags(s, G.xflags);
@@ -758,24 +722,16 @@ void newopt(Cstr s)
 			continue;
 		case 'z':		/* all except Z, N, O suppress printnode */
 			setallflags();
-			/* printnode; do separate with -xno or do -*a ... */
 			debugN = 0;
 			debugO = 1;	/* is a suppressor */
 			continue;
 		case 'n':						/* No object output */
 			ON_OFF(G.an_no_O);
-		case 'd':						/* suppress newest peep */
-			ON_OFF(G.ad_new_peep);
-		case 'k':
-			printtoks();
-			waitexit(0);
+		case 'd':						/* suppress optimizer */
+			ON_OFF(G.ad_nopeep);
 #endif
 		case 'e':
 			ON_OFF(G.ae_no_extracodes);		/* suppress extracodes (ahcc_rt.h) */
-		case 'r':			/* suppress register variables */
-			ON_OFF(G.ar_no_registerization);
-		case 't':
-			ON_OFF(G.at_Tony);
 		case 'b':
 			ON_OFF(G.ab_no_branch_reversals);
 		case 'c':
@@ -802,75 +758,70 @@ void newopt(Cstr s)
 	}
 }
 
+short cdbv(Cstr s);
+Cstr sis(Cstr s)
+{
+	if (*s eq '=') s++;
+	return s;
+}
+
+/* 02'18 HR corrected wrong scope of me,mw,mi,
+            then replaced by i = cdbv()
+*/
 /*		PURE_C compatible options		*/
 static
 void doopt(Cstr s)
 {
 	register char c;
-	short
-		me = 0,
-	    mw = 0,
-	    mi = 0;
-
+	short i;
+/*
+	G.use_FPU = true;		/* 07'19 HR: v6 (no fp emulation) */
+*/
 	while ((c = *s++) ne 0 )
 	{
 		c = tolower(c);
 		switch (c)
 		{
 		case 'a':
-			ON_OFF(G.a_strict_ANSI);
 		case 'b':
-			ON_OFF(G.b_output_DRI);
+		case 'g':			/* size optimization */
+		case 'j':			/* Dont optimize jumps */
+		case 'm':
+		case 'n':
+		case 'p':
+		case 'q':
+		case 's':
+		case 't':
+		case 'y':
+		case 'z':
+			return;;
 		case 'c':				/* nested comments */
 			ON_OFF(G.c_nested_comments);
 		case 'd':
-			if (*s eq '=')			/* 10'10 HR */
-				s++;
-			adddef(s);
+			adddef(sis(s));
 			return;
 		case 'e':				/* no of errors */
-			while(*s >='0' and *s <= '9')
-				me = (me*10) + (*s++-'0');
-			if (me)
-				G.e_max_errors = me;
+			i = cdbv(s);
+			if (i)
+				G.e_max_errors = i;
 			return;
 		case 'f':				/* no of warnings */
-			while(*s >='0' and *s <= '9')
-				mw = (mw*10) + (*s++-'0');
-			if (mw)
-				G.f_max_warnings = mw;
+			i = cdbv(s);
+			if (i)
+				G.f_max_warnings = i;
 			return;
-		case 'g':			/* size optimization */
-			ON_OFF(G.g_optimum_size);
 		case 'h':			/* use cdecl calling */
 			ON_OFF(G.h_cdecl_calling);
 		case 'i':
-			if (*s eq '=')			/* 10'10 HR */
-				s++;
-			doincl(s);
+			doincl(sis(s));
 			return;
-		case 'j':			/* Dont optimize jumps */
-			ON_OFF(G.j_no_jump_optimization);
 		case 'k':			/* default char is unsigned */
 			ON_OFF(G.k_char_is_unsigned);
 		case 'l':
-			while(*s >='0' and *s <= '9')
-				mi = (mi*10) + (*s++-'0');
-			if (mi)
-				G.l_identifier_max_length = mi;
+			i = cdbv(s);
+			if (i)
+				G.l_identifier_max_length = i;;
 			return;
-		case 'm':
-			ON_OFF(G.m_string_merging);
-		case 'n':
-			ON_OFF(G.n_nmlist);
-		case 'p':
-			ON_OFF(G.p_absolute_calls);
-		case 'q':
-			ON_OFF(G.q_pascal_calling);
-		case 's':
-			ON_OFF(G.s_frame_pointer);
-		case 't':
-			ON_OFF(G.t_stack_checking);
 		case 'u':
 #if BIP_ASM
 			if (G.xlang eq 's')	/* 10'12 HR: v4.15, ambiguous u option (undef)!!! */
@@ -892,16 +843,12 @@ void doopt(Cstr s)
 			return;
 		case 'x':
 			ON_OFF(G.x_add_underline);
-		case 'y':
-			ON_OFF(G.y_debugging);
-		case 'z':
-			ON_OFF(G.z_register_reload);
 #if COLDFIRE
 		case '7':			/* Coldfire (double is 64 bits)  */
 			ON_OFF(G.Coldfire);
 #endif
 #if COLDFIRE || FLOAT
-		case '2':			/* generate for >= 68020 or CF compatible */
+		case '2':			/* generate for >= 68020 or CF compatible if also -7 */
 			ON_OFF(G.i2_68020);
 		case '3':
 			ON_OFF(G.i2_68030);
@@ -920,6 +867,8 @@ void doopt(Cstr s)
 #endif
 		}
 	}
+/*	console("use_FPU = %d\n", G.use_FPU);
+*/
 }
 
 #include "cache.h"
@@ -1019,7 +968,7 @@ CP load_source_file(Cstr name, short *count)
 				long lines;
 				char *s;
 
-				cl = C_lexical(1, name, true, bitmap, lex, &lines, error, G.c_nested_comments,
+				cl = C_lexical(name, true, bitmap, lex, &lines, error, G.c_nested_comments,
 #if BIP_ASM || FOR_A
 				G.xlang
 #else
@@ -1057,7 +1006,7 @@ CP load_source_file(Cstr name, short *count)
 					fd->fileno = fileno;
 
 					if (G.aj_auto_depend or G.ah_project_help)
-						pdb_fdepend(&auto_dependencies, iname, name, fileno, 1);
+						pdb_fdepend(&auto_dependencies, iname, name, fileno);
 				}
 #else
 				filecount++;
@@ -1104,7 +1053,7 @@ short AHCC(short argc, char **argv)
 #endif
 	short shownames;
 
-#if CC_LEAK
+#ifdef CC_LEAK
 /*	static long memory = 0, this = 0;
 	if (memory eq 0)
 		(void *)memory = Malloc(-1L);
@@ -1170,7 +1119,8 @@ short AHCC(short argc, char **argv)
 	            bugf = fopen(ern.s, "w");
 	        }
 #endif
-#if BIP_ASM
+
+#if BIP_ASM || FOR_A
 			suf = getsuf(argv[0]);
 
 			if (suf)			/* 09'16 HR v5.5 Prevent crashes on ill formed options.*/
@@ -1238,24 +1188,18 @@ console("argv '%s'\n", argv[0]);
 						)
 				   )
 				{
+					extern S_path o_name;  /* ex out.c */
 					argv++;
 					argc--;
 					DIRcpy(&G.output_name, &argv[0][2]);
-#if BIP_ASM
-					if (G.xlang ne 's')
-#endif
+					o_name = G.output_name;
+					if (!make_out())
 					{
-						G.output       = open_S(G.output_name.s);
-						if (G.output eq nil)
-						{
-							console("Can't open output %s\n", G.output_name);
-							succ = 1;
-							continue;
-						}
+						succ = 1;
+						continue;
 					}
 				}
 			}
-
 			if (argc > 0 or shownames) /* meer dan 1 input file */
 			{
 				shownames++;
@@ -1264,7 +1208,7 @@ console("argv '%s'\n", argv[0]);
 				console("\n");
 			}
 
-			if (!out_setup(G.inctab->name))		/* fills output_name */
+			if (!out_setup(G.inctab->name))		/* fills output_name's */
 			{
 				succ = 1;
 				continue;
@@ -1335,21 +1279,15 @@ console("argv '%s'\n", argv[0]);
 			else
 				succ  = do_file();	/* definitely     "       "         "	  */
 
-			if (!G.ac_cache_headers)		/* 12'09 HR: forgot to do this */
-				free_cache();
-
 			freedefs();				/* 10'12 HR: 4.14 */
-#if CC_LEAK
-			XA_leaked(&XA_NS_base,  -1, -1, cpunit,4);
-			XA_leaked(&XA_CC_base,  -1, -1, cpunit,5);
-			XA_leaked(&XA_CC_fbase, -1, -1, cpunit,6);
+#ifdef CC_LEAK
+			XA_leaked(&XA_NS_base,  -1, -1, cpunit, 4);
+			XA_leaked(&XA_CC_base,  -1, -1, cpunit, 5);
+			XA_leaked(&XA_CC_fbase, -1, -1, cpunit, 6);
 #endif
 		}
 	}
 
-#if ! BIP_CC
-	free_cache();
-#endif
 	free_srchlist();		/* -i directories */
 
 	if (G.anydebug)
@@ -1377,7 +1315,7 @@ bool askq(void)
 		if (breakin > BRKVAL)
 		{
 			breakin = 0;
-			send_msg(corq);
+			console(corq);
 			c = bios(2, 2);
 			if (c eq 'q')
 				return true;
@@ -1422,21 +1360,21 @@ void errorn (void *vp, Cstr s, ...)
 	vsprintf(errbuf, s, argpoint);
 	va_end(argpoint);
 	if (G.inctab)
-		send_msg("%s   in %s L%ld %s", Error, G.inctab->name, line, errbuf);
+		console("%s   in %s L%ld %s", Error, G.inctab->name, line, errbuf);
 	else
-		send_msg("%s   %s", Error, errbuf);
+		console("%s   %s", Error, errbuf);
 	if (tp)
 	{
-		send_msg(" : '");
+		console(" : '");
 		if (tp->nt eq FLNODE)
-			send_msg("%s", tp->name);
+			console("%s", tp->name);
 		else
 			send_name(tp->nt eq GENODE
 							? childname(tp)
 							: find_name(tp));
-		send_msg("'");
+		console("'");
 	}
-	send_msg("\n");
+	console("\n");
 	G.nmerrors++;
 #if ! BIP_CC
 	if (bugf eq stdout) if ( askq() ) exit(1);
@@ -1459,11 +1397,11 @@ void error(Cstr s, ...)
 	va_end(argpoint);
 
 	if (G.inctab and G.inctab->name and *G.inctab->name)
-		send_msg("%s   in %s L%ld %s\n", Error, G.inctab->name, line_no, errbuf);
+		console("%s   in %s L%ld %s\n", Error, G.inctab->name, line_no, errbuf);
 	elif (G.input_name.s and *G.input_name.s)
-		send_msg("%s   in %s L%ld %s\n", Error, G.input_name.s, line_no, errbuf);
+		console("%s   in %s L%ld %s\n", Error, G.input_name.s, line_no, errbuf);
 	else
-		send_msg("%s   %s\n", Error, errbuf);
+		console("%s   %s\n", Error, errbuf);
 
 	G.nmerrors++;
 #if ! BIP_CC
@@ -1488,23 +1426,23 @@ void warnn(void *vp, Cstr s, ...)
 	va_end(argpoint);
 
 	if (G.inctab and !G.eof)
-		send_msg("%s in %s L%ld %s", Warning, G.inctab->name, line, errbuf);
+		console("%s in %s L%ld %s", Warning, G.inctab->name, line, errbuf);
 	else
-		send_msg("%s %s", Warning, errbuf);
+		console("%s %s", Warning, errbuf);
 
 	if (tp)
 	{
-		send_msg(" : '");
+		console(" : '");
 		if (tp->nt eq FLNODE)
-			send_msg("%s", tp->name);
+			console("%s", tp->name);
 		else
 			send_name(tp->nt eq GENODE
 							? childname(tp)
 							: find_name(tp));
-		send_msg("'");
+		console("'");
 	}
 
-	send_msg("\n");
+	console("\n");
 	G.nmwarns++;
 #if ! BIP_CC
 	if (bugf eq stdout) if ( askq() ) exit(1);
@@ -1525,9 +1463,9 @@ void warn(Cstr s, ...)
 	vsprintf(errbuf, s, argpoint);
 	va_end(argpoint);
 	if (G.inctab)
-		send_msg("%s in %s L%ld %s\n", Warning, G.inctab->name, line_no, errbuf);
+		console("%s in %s L%ld %s\n", Warning, G.inctab->name, line_no, errbuf);
 	else
-		send_msg("%s %s\n", Warning, errbuf);
+		console("%s %s\n", Warning, errbuf);
 	G.nmwarns++;
 #if ! BIP_CC
 	if (bugf eq stdout) if ( askq() ) exit(1);
@@ -1546,7 +1484,7 @@ Cstr src_name(void)
 }
 
 global
-void messagen(short lvl, short which, void *vp, Cstr s, ...)
+void messagen(void *vp, Cstr s, ...)
 {
 	NP tp = vp;
 	Cstr n = (G.inctab) ? G.inctab->name : G.input_name.s;
@@ -1557,32 +1495,28 @@ void messagen(short lvl, short which, void *vp, Cstr s, ...)
 	vsprintf(errbuf,s, argpoint);
 	va_end(argpoint);
 
-	send_msg("%d>", lvl);
-	if (which and n)
-		send_msg("%s[%d] in %s L%ld %s", Message, which, n, line, errbuf);
-	elif (n)
-		send_msg("%s in %s L%ld %s", Comment, n, line, errbuf);
+	if (n)
+		console("%s in %s L%ld %s", Comment, n, line, errbuf);
 	else
-		send_msg("%s %s", Comment, errbuf);
+		console("%s %s", Comment, errbuf);
 
 	if (tp)
 	{
-		send_msg(" : '");
+		console(" : '");
 		send_name(tp->nt eq GENODE
 						? childname(tp)
 						: find_name(tp));
-		send_msg("'");
+		console("'");
 	}
 
-	send_msg("\n");
+	console("\n");
 #if ! BIP_CC
 	if (bugf eq stdout) if ( askq() ) exit(1);
 #endif
-	if (which) Cconin();
 }
 
 global
-void message(short lvl, short which, Cstr s, ...)
+void message(Cstr s, ...)
 {
 	Cstr n = (G.inctab) ? G.inctab->name : G.input_name.s;
 	va_list argpoint;
@@ -1590,18 +1524,14 @@ void message(short lvl, short which, Cstr s, ...)
 	vsprintf(errbuf, s, argpoint);
 	va_end(argpoint);
 
-	send_msg("%d>", lvl);
-	if (which and n)
-		send_msg("%s[%d] in %s L%ld %s\n", Message, which, n, line_no, errbuf);
-	elif (n)
-		send_msg("%s in %s L%ld %s\n", Comment, n, line_no, errbuf);
+	if (n)
+		console("%s in %s L%ld %s\n", Comment, n, line_no, errbuf);
 	else
-		send_msg("%s %s\n", Comment, errbuf);
+		console("%s %s\n", Comment, errbuf);
 
 #if ! BIP_CC
 	if (bugf eq stdout) if ( askq() ) exit(1);
 #endif
-	if (which) Cconin();
 }
 
 global

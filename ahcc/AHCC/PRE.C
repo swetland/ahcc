@@ -35,7 +35,6 @@ static
 char * d_prelude = "__prelude__";
 #endif
 
-short alert_text(char *, ...);
 /*
  *	pre.c
  *
@@ -67,7 +66,6 @@ short alert_text(char *, ...);
 
 #include "common/mallocs.h"
 #include "common/amem.h"
-#include "common/hierarch.h"
 #include "common/pdb.h"
 
 #include "param.h"
@@ -86,6 +84,7 @@ XP *deflist;
 XP getnode(void);			/* recursion */
 
 long bios( void, ... );		/* bij Sozobon in STDIO.H */
+const char * pluralis(short);
 
 extern
 char trtime[], trdate[];		/* compiletime/date (once per translation unit) */
@@ -117,21 +116,6 @@ typedef struct cmds
 static
 char expects[]="preprocessor expects";
 
-global void check_cache(short which, const char *s)
-{
-	short c = 0;
-	CP ch = cache;
-	while (ch)
-	{
-		if (!ch->name)
-			alert_text("(%d)'%s' @ %d, | this %lx| name %lx next %lx | fileno %d   text %lx",
-			             which,s,        c,   ch,       ch->name,ch->next,  ch->fileno, ch->text);
-
-		c++;
-		ch = ch->next;
-	}
-}
-
 static
 void PR_list(XP val, Cstr m)
 {
@@ -159,7 +143,7 @@ XP tok_to_node(void)
 XP tok_to_node(void)
 {
 if (curtok->token eq ROL)
-	message(0, 0, "ROL %d", curtok->prec);
+	message("ROL %d", curtok->prec);
 	curtok->nt = DFNODE;
 	return curtok;
 }
@@ -222,7 +206,7 @@ void cat_lex(XP np)
 	long l = strlen(np->name);
 
 	tokked = CC_xmalloc(res_LEX*l + res_LEX, AH_FUSE_NAME_C, CC_ranout);	/* 6 times is theoretical maximum of C_lexical + end */
-	l = C_lexical(2, nil, false, np->name, tokked, nil, nil, false, G.lang);
+	l = C_lexical(nil, false, np->name, tokked, nil, nil, false, G.lang);
 	free_name(np);
 	np->nflgs.f.nheap = 1;
 	np->name = (Cstr)tokked;
@@ -301,13 +285,13 @@ void slash_double(char *d, Cstr s)
 static
 bool builtin(XP np)
 {
-	if   (strcmp(np->name, "__LINE__") eq 0)
+	if   (SCMP(99,np->name, "__LINE__") eq 0)
 	{
 		np->token = ICON;
 		np->val.i = line_no;
 		return true;
 	}
-	elif (strcmp(np->name, "__FILE__") eq 0)
+	elif (SCMP(95,np->name, "__FILE__") eq 0)
 	{
 		char double_slash[256];
 		slash_double(double_slash, G.inctab->name);		/* 01'09 HR */
@@ -315,26 +299,26 @@ bool builtin(XP np)
 		np->val.i = new_name(np, LQUOTED "%s" RQUOTED, double_slash);
 		return true;
 	}
-	elif (strcmp(np->name, "__TIME__") eq 0)
+	elif (SCMP(96,np->name, "__TIME__") eq 0)
 	{
 		np->token = SCON;
 		np->val.i = new_name(np, LQUOTED "%s" RQUOTED, trtime);
 		return true;
 	}
-	elif (strcmp(np->name, "__DATE__") eq 0)
+	elif (SCMP(97,np->name, "__DATE__") eq 0)
 	{
 		np->token = SCON;
 		np->val.i = new_name(np, LQUOTED "%s" RQUOTED, trdate);
 		return true;
 	}
-	elif (strcmp(np->name, "__STDC__") eq 0)
+	elif (SCMP(98,np->name, "__STDC__") eq 0)
 	{
 		np->token = ICON;
 		np->val.i = true;
 		return true;
 	}
-	elif (   strcmp(np->name, "__func__") eq 0
-	      or strcmp(np->name, "__FUNCTION__") eq 0)		/* 03'09 */
+	elif (   SCMP(99,np->name, "__func__") eq 0
+	      or SCMP(100,np->name, "__FUNCTION__") eq 0)		/* 03'09 */
 	{
 		Cstr pname = G.prtab ? G.prtab->name : "File";
 
@@ -401,7 +385,7 @@ bool l_cmp(XP p1, XP p2)		/* names --> true: truely equal */
 		case ID:
 		case SCON:
 		case SCON1:
-			return strcmp(p1->name, p2->name) eq 0;
+			return SCMP(90,p1->name, p2->name) eq 0;
 		case ICON:
 #if FLOAT
 		case FCON:
@@ -429,22 +413,28 @@ bool l_cmp(XP p1, XP p2)		/* names --> true: truely equal */
 static
 bool same_list(XP p1, XP p2)		/* true = equal */
 {
-	D_(P, "same_list");
-
 	if (p1 eq nil)
 		if (p2 eq nil) return true;
 	if (p2 eq nil)
 		return false;
-	if (l_cmp(p1, p2) eq 0)
-		return true;
+	{
+#if 0
+		if ((long)p1 < 45 or (long)p2 < 45)
+		{
+			alert_text("p1 = %lx | p2 = %lx", p1, p2);
+			Cconin();
+			return false;
+		}
+#endif
+		if (l_cmp(p1, p2) eq 0)
+			return true;
+	}
 	return same_list(p1->next, p2->next);
 }
 
 static
 bool samedef(XP p1, XP p2)		/* true = equal */
 {
-	D_(P, "samedef\t");
-
 	if (p1->val.i ne p2->val.i)
 		return false;
 	return same_list(p1->tseq, p2->tseq);
@@ -456,7 +446,6 @@ void mark_exp(XP def, XP val)
 {
 	while (val)
 	{
-		val->nflgs.f.Xp = 1;
 		if (val->token eq ID and def->name eq val->name)
 			val->nflgs.f.nexp = 1;
 		val = val->next;
@@ -467,8 +456,6 @@ global
 void do_define(XP def, XP val, XP args, bool pdb, short isasm)
 {
 	XP oldp; short h;
-
-	D_(P, "do_define");
 
 	if (args ne nil)
 	{
@@ -513,7 +500,7 @@ static
 short defnargs;
 
 static
-Cstr pwarn(short isasm) { return graphic[isasm ? SELECT : PREP]; }
+Cstr pwarn(short isasm) { return graphic[isasm ? SELECTOR : PREP]; }
 
 global
 XP def_arglist(short isasm)
@@ -522,7 +509,6 @@ XP def_arglist(short isasm)
 	   np   = nil,
 	   rv   = nil;
 
-	D_(P, "def_arglist");
 	do{
 		if tok_ne(ID)
 		{
@@ -555,8 +541,6 @@ static
 XP def_args(short isasm)			/* make LIST of args, NOT tree */
 {
 	XP rv;
-
-	D_(P, "def_args");
 
 	if (tok_next() eq NERAP)		/* empty arg list is OK */
 	{
@@ -682,8 +666,6 @@ XP def_val(short endv, short isasm)
 	short level = 0;
 #endif
 
-	D_(P, "def_val");
-
 	G.in_def = true;
 
 	if (tok_is(WS))			/* 03'09 oooops */
@@ -796,9 +778,9 @@ void optdef(Cstr s, Cstr as)	/* as must be just 1 token */
 	G.tk_flags |= TK_SEENL;
 	tokked = CC_xmalloc(res_LEX*strlen(as) + res_LEX, AH_OPTDEF, CC_ranout);		/* as is minimal a "1" */
 #if BIP_ASM || FOR_A
-	C_lexical(3, nil, false, as, tokked, nil, nil, false, G.lang);
+	C_lexical(nil, false, as, tokked, nil, nil, false, G.lang);
 #else
-	C_lexical(4, nil, false, as, tokked, nil, nil, false, 'c');
+	C_lexical(nil, false, as, tokked, nil, nil, false, 'c');
 #endif
 	cur_LEX = tokked;
 	tok_next();
@@ -1008,8 +990,6 @@ XP spar_fix(XP sub)
 	short i = 2;		/* for 2 quotes	*/
 	XP scons = sub;
 
-	D_(P, "spar_fix");
-
 	while (scons)
 	{
 		i += strlen(scons->name);
@@ -1218,8 +1198,6 @@ PRE_COMMAND p_undef
 {
 	XP np, tp; short h;
 
-	D_(P, "p_undef");
-
 	if (tok_next() ne ID)
 		error("bad %sundef", pwarn(isasm));
 	else
@@ -1348,7 +1326,7 @@ void freeincs(void)
 			cp = cp->next;
 		}
 		if (no)
-			send_msg("Cached %d header%s in %ldK\n", no, pluralis(no), (size+1023)/1024);
+			console("Cached %d header%s in %ldK\n", no, pluralis(no), (size+1023)/1024);
 	}
 }
 
@@ -1366,8 +1344,6 @@ bool reduce_path(char *path)
 	return false;
 }
 
-#include "common/hierarch.h"
-
 global
 bool is_drive(Cstr s)
 {
@@ -1378,7 +1354,7 @@ void inc_stats(CP, bool);
 VP load_bin(char *name);
 
 static
-CP look_file(S_path *dir, TP scon, short *fileno, short what)
+CP look_file(S_path *dir, TP scon, short *fileno)
 {
 	CP xp;
 	S_path f;
@@ -1393,14 +1369,14 @@ CP look_file(S_path *dir, TP scon, short *fileno, short what)
 	DIRcat(&f, scon->name);
 	hn_dotdot(f.s, ":\\.", 4);		/* collapse \..\ */
 
-	if (strcmp(lasttry.s, f.s) eq 0)	/* useless try */
+	if (SCMP(91,lasttry.s, f.s) eq 0)	/* useless try */
 		return nil;
 
 	if (G.incbin)
 	{
 		(VP)xp = load_bin(f.s);
 	othw
-		xp = cache_look(3, cache, nil, f.s, true);
+		xp = cache_look(cache, nil, f.s, true);
 
 		if (xp and fileno)
 		{
@@ -1410,7 +1386,7 @@ CP look_file(S_path *dir, TP scon, short *fileno, short what)
 			G.C_bytes += xp->bytes;
 #if BIP_CC
 			if (G.aj_auto_depend or G.ah_project_help)
-				pdb_fdepend(&auto_dependencies, G.inctab ? G.inctab->name : nil ,f.s, *fileno, 2);
+				pdb_fdepend(&auto_dependencies, G.inctab ? G.inctab->name : nil ,f.s, *fileno);
 			else
 				*fileno = xp->fileno;
 #endif
@@ -1420,7 +1396,7 @@ CP look_file(S_path *dir, TP scon, short *fileno, short what)
 
 #if DEBUGINC
 		if (G.v_Cverbosity > 3)
-			console("[%d]tried '%s' :: %s\n", what, f.s, xp ? "OK" : "FAIL");
+			console("tried '%s' :: %s\n",f.s, xp ? "OK" : "FAIL");
 #endif
 
 		if (xp eq nil)
@@ -1445,31 +1421,29 @@ CP srch_open(TP scon, bool here, short *fileno)
 #endif
 
 #if DEBUGINC
-	if (G.v_Cverbosity > 3)
-		send_msg("srch_open %s\n", scon->name);
+	if (G.v_Cverbosity > 2)
+		console("srch_open %s\n", scon->name);
 #endif
 
 	if (is_drive(scon->name))
 	{
 		temp.s[0] = 0;
-		xp = look_file(&temp, scon, fileno,1);
+		xp = look_file(&temp, scon, fileno);
 	othw
 		Cstr *dir = srchlist;
 
 		if (here)			/* "name" */
 		{
-/*			if (G.v_Cverbosity > 3)
-				message(0, 0, "includer is '%s'", G.includer.s);
-*/			xp = look_file(&G.includer, scon, fileno,2);
+			xp = look_file(&G.includer, scon, fileno);
 			if (xp)
 				return xp;
 
 			DIRcpy(&thisdir, G.input_dir.s);		/* look in current dir */
-			xp = look_file(&G.input_dir, scon, fileno,3);
+			xp = look_file(&G.input_dir, scon, fileno);
 
 			if (xp eq nil)
 				while (reduce_path(thisdir.s))	/* go up in current dir */
-					if ( (xp = look_file(&thisdir, scon, fileno,4)) ne nil)
+					if ( (xp = look_file(&thisdir, scon, fileno)) ne nil)
 						break;
 			if (xp)
 				return xp;
@@ -1480,29 +1454,29 @@ CP srch_open(TP scon, bool here, short *fileno)
 			{
 				DIRcpy(&temp, G.input_dir.s);				/* 11'09 HR: look in directory of PRJ as well for !here */
 				DIRcat(&temp, *dir);
-				xp = look_file(&temp, scon, fileno,5);
+				xp = look_file(&temp, scon, fileno);
 				if (!xp)
 				{
 #if BIP_CC
 					DIRcpy(&temp, mkpad.s);		/* look in current dir */
 					DIRcat(&temp, *dir);
-					xp = look_file(&temp, scon, fileno,6);
+					xp = look_file(&temp, scon, fileno);
 					if (!xp)
 #endif
 					{
 #if CC_PATH
 						DIRcpy(&temp, CC_path.s);
 						DIRcat(&temp, *dir);
-						xp = look_file(&temp, scon, fileno,7);
+						xp = look_file(&temp, scon, fileno);
 #else
 						DIRcpy(&temp, *dir);
-						xp = look_file(&temp, scon, fileno,8);
+						xp = look_file(&temp, scon, fileno);
 #endif
 					}
 				}
 			othw
 				DIRcpy(&temp, *dir);
-				xp = look_file(&temp, scon, fileno,9);
+				xp = look_file(&temp, scon, fileno);
 			}
 
 			if (xp)
@@ -1513,7 +1487,7 @@ CP srch_open(TP scon, bool here, short *fileno)
 
 #if BIP_CC
 		if (xp eq nil)							/* try project dir */
-			xp = look_file(&mkpad, scon, fileno,10);
+			xp = look_file(&mkpad, scon, fileno);
 #endif
 	}
 
@@ -1538,7 +1512,9 @@ void newfile(CP sp, short fileno)
 		cur_LEX = sp->text;
 		line_no = n_line_no = 1;
 		G.tk_flags = TK_SAWNL;    /* 03'09 */
-		send_incname(ip->p.lvl, np->name);		/* name w/o path */
+#if C_DEBUG
+		send_incname(ip->p.lvl, np->name);
+#endif
 	}
 }
 
@@ -1601,7 +1577,6 @@ static
 PRE_COMMAND p_inc
 {
 	short fileno = 0;
-	D_(P, "p_inc");
 	newfile(incl_name(isasm, &fileno), fileno);
 }
 
@@ -1631,8 +1606,6 @@ void invoke_runtime(void)
 static
 void p_defined(NP np)	/* traverse expr tree for defined */
 {
-	D_(P, "p_defined");
-
 	if (np->token eq DEFINED)
 	{
 		NP lp;				/* defined is unary dus geen right meer */
@@ -1693,7 +1666,6 @@ long if_expr(CMDS *cp, short isasm)
 
 	tp = questx();
 
-
 	G.in_if_X = false;			/* 3'91 v1.2 */
 	G.skip_id = false;
 #if BIP_ASM
@@ -1704,6 +1676,7 @@ long if_expr(CMDS *cp, short isasm)
 	{
 		p_defined(tp);			/* 3'91 v1.2 */
 		rv = confold_value(tp, FORTRUTH);
+
 		if (cp->kind < IF)			/* 10'10 HR */
 		{
 			switch(cp->kind)
@@ -1726,6 +1699,7 @@ long if_expr(CMDS *cp, short isasm)
 			freeXn(cur);
 		else
 			freenode((NP)cur);
+
 	return rv;
 }
 
@@ -1814,8 +1788,6 @@ PRE_COMMAND p_def
 {
 	XP args, val, def;
 
-	D_(P, "p_def");
-
 	defnargs = -1;
 	args = nil;
 	val = nil;
@@ -1828,7 +1800,7 @@ PRE_COMMAND p_def
 	}
 
 #if FOR_A
-	if (strcmp(curtok->name, d_prelude) eq 0)
+	if (SCMP(92,curtok->name, d_prelude) eq 0)
 	{
 		G.prelude = true;
 		return;
@@ -1964,8 +1936,6 @@ PRE_COMMAND p_repeat
 static
 PRE_COMMAND p_line
 {
-	D_(P, "p_line");
-
 	G.tk_flags |= TK_LTSTR;		/* allow <......> */
 	advnode();
 	if cur_ne(ICON)
@@ -1987,7 +1957,7 @@ PRE_COMMAND p_line
 static
 void pr_msg(Cstr w)
 {
-	send_msg("%s directive in %s L%ld ",  w, G.inctab->name, line_no);
+	console("%s directive in %s L%ld ",  w, G.inctab->name, line_no);
 	do
 	{
 		G.tk_flags |= TK_SEEWS;
@@ -2051,16 +2021,14 @@ PRE_COMMAND p_ragma
 		if (stricmp(s, "prln") eq 0)
 		{
 			if (G.To_prln)		/* 10'14 v5.2 */
-				print_node(G.To_prln, "#pragma prln", 1, 1);
+				print_node(G.To_prln, "#pragma prln", 1, 1, 0);
 		}
 		else
 	#endif
 		while (*s)
 		{
-			if   (*s eq 'r')	G.pragmats.noregs = false;
-			elif (*s eq 'R')	G.pragmats.noregs = true;
-			elif (*s eq 'n')	G.pragmats.new_peep = false;
-			elif (*s eq 'N')	G.pragmats.new_peep = true;
+			if   (*s eq 'n')	G.pragmats.nopeep = false;
+			elif (*s eq 'N')	G.pragmats.nopeep = true;
 			s++;
 		}
 	}
@@ -2073,14 +2041,10 @@ PRE_COMMAND p_ragma
 		if (stricmp(s, "prln") eq 0)
 		{
 			if (G.To_prln)		/* 10'14 v5.2 */
-				print_node(G.To_prln, "#pragma prln", 1, 1);
+				print_node(G.To_prln, "#pragma prln", 1, 1, 0);
 		}
 		else
 	#endif
-	if   (strcmp(s, "noregs"   ) eq 0)	G.pragmats.noregs   = false;
-	elif (strcmp(s, "regs"     ) eq 0)	G.pragmats.noregs   = true;
-	elif (strcmp(s, "nonewpeep") eq 0)	G.pragmats.new_peep = false;
-	elif (strcmp(s, "newpeep"  ) eq 0)	G.pragmats.new_peep = true;
 	s++;
 
 		tok_next();
@@ -2102,7 +2066,7 @@ PRE_COMMAND p_toA
 {
 	G.lang = 'a';
 	if (G.v_Cverbosity)
-		message(0, 0, "A syntax");
+		message("A syntax");
 	subdef("__C__");
 	subdef("__A__");
 	adddef("__A__=1");
@@ -2114,7 +2078,7 @@ PRE_COMMAND p_toC
 {
 	G.lang = 'c';
 	if (G.v_Cverbosity)
-		message(0, 0, "C syntax");
+		message("C syntax");
 	subdef("__A__");
 	subdef("__C__");
 	adddef("__C__=1");
@@ -2225,7 +2189,7 @@ void C_pre(Cstr s)
 #if BIP_ASM
 		if ((G.lang eq 's' ? stricmp : strcmp)(s, cp->text) eq 0)
 #else
-		if (strcmp(s, cp->text) eq 0)
+		if (SCMP(93,s, cp->text) eq 0)
 #endif
 		{
 			if (G.iftab->p.truth or cp->kind ne NO_NEST)
@@ -2261,25 +2225,6 @@ void dopound(void)
 	return;
 }
 
-#if 0
-void pr_exp(XP ep, XP rv, short level, short which)
-{
-	message(0,0,"expanded [%d]level %d %s -->", which, level, rv->name);
-
-	ep = ep->tseq;
-	while (ep)
-	{
-		send_msg("\t%s\n", ep->name);
-		ep = ep->next;
-	}
-
-	Cconin();
-}
-#endif
-
-#if BIP_ASM and FOR_A
-#include "getnode.h" /* text w/o #if's for clarity */
-#else
 static
 XP getnode(void)
 {
@@ -2288,7 +2233,7 @@ XP getnode(void)
 
 	if (rv eq nil)
 		rv = to_endof();
-	elif (G.in_if_X and strcmp(rv->name, "defined") eq 0)	/* ANSI 'defined' is treated as unary operator. */
+	elif (G.in_if_X and SCMP(94, rv->name, "defined") eq 0)	/* ANSI 'defined' is treated as unary operator. */
 	{
 		G.skip_id = true;		/* do not expand very next identifier */
 		rv->token = DEFINED;
@@ -2337,7 +2282,6 @@ XP getnode(void)
 
 	return rv;
 }
-#endif
 
 #define T (unsigned char)
 
@@ -2497,9 +2441,9 @@ void advnode(void)		/* definitely after ALL preprocessing */
 		elif (   xcur->token eq BADTOK)	/* delayed discarding of irregular tokens */
 		{
 			if (xcur->name)
-				error("illegal char '%c'(%#X)", *xcur->name, *xcur->name);
+				error("Illegal char '%c'(%#X)", *xcur->name, *xcur->name);
 			else
-				error("illegal character");
+				error("Illegal character");
 			freeXn(xcur);
 			advnode();
 		othw

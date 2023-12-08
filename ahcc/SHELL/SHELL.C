@@ -23,15 +23,15 @@
  *  common to GEM shell & TTP shell
  */
 
+#define NEWP 1
+
 #include <tos.h>
 #include <ctype.h>
 #include <time.h>
-#include "common/mallocs.h"
 #include "common/aaaa_lib.h"
 #include "common/hierarch.h"
+#include "common/mallocs.h"
 #include "common/pdb.h"
-#include "common/ipff.h"
-#include "common/ahcm.h"
 #include "aaaa_ini.h"
 #include "common/config.h"
 #include "common/dict.h"
@@ -42,16 +42,24 @@
 
 #define SHOWL 72
 
+global
+short depth = 0;
+void send_msg(char *text, ...);
+
+#if   1
+#define TRACE(a)
+#elif 0
+#define TRACE(a) form_alert(1,"[0][-=" #a "=-][OK|NO]");
+#else
+#define TRACE(a) send_msg("%d>-= " #a " =-\n", level), Cconin()
+#endif
+
 extern
 OBJECT *menu;
 
 #if ! BIP_CC
 short filecount = 0, high_prj = 0;		/* otherwise in AHCC.C */
 #endif
-
-void send_msg(char *text, ...);
-
-void free_cache(void);
 
 /* If the program is started with an argument
 	we want start with that file,
@@ -60,7 +68,6 @@ void free_cache(void);
 extern
 bool init_open_jrnl;
 
-void dial_b2(void);
 global
 short pdrive;
 
@@ -87,7 +94,7 @@ S_path cerf;
  */
 
 global
-SH_SUFS sufs = {".app", ".prg", ".ttp", ".tos", ".c", ".a", ".h", ".d", ".s", ".o", ".l", ".lib", ".pr?"};
+SH_SUFS sufs = {".app", ".prg", ".ttp", ".tos", ".c", ".a", ".s", ".o", ".ovl", ".l", ".lib", ".prj"};
 
 global
 PRJ root_project;
@@ -127,12 +134,8 @@ SHEL_CONFIG SHL_cfg =
 	0,			/* al_list_stats		*/
 	1,			/* opt_inherit			*/
 	0,			/* aj_auto_depend		*/
-
-	0,			/* ad_new_peep			*/
-	0,			/* ak_token_list		*/
-
+	0,			/* ad_nopeep			*/
 	0,			/* aw_Xnl				*/
-
 	0,			/* ax_debugging			*/
 	0,			/* ay_debugging			*/
 	0,			/* aa_debugging			*/
@@ -183,11 +186,13 @@ char **make_argv(char *cmd)
 }
 
 static
-short findupsuf(char *f, char *s)
+bool is_suf(char *f, char *s)
 {
 	char *p; short i;
 
-	p = f; i = strlen(f)-1;		/* No trailing spaces svp (after ;) */
+	p = f;
+	i = strlen(f)-1;		/* No trailing spaces svp */
+
 	while (i)
 		if (p[i] eq ' ' or p[i] eq '\t')
 			i--;
@@ -197,14 +202,11 @@ short findupsuf(char *f, char *s)
 	p[i+1] = 0;
 
 	if ((p = strrchr(f, '.')) ne nil)
-	{
 		if (strslash(p) eq nil)
-			if ( stricmp(p, s) )	/* er is een suffix */
-				return 0;	/* ongelijk fout */
-			else
-				return tolower(*(p+1));	/* gelijk return eerste letter */
-	}
-	return ' ';					/* geen  */
+			if ( stricmp(p, s) eq 0)	/* er is er een */
+				return true;			/* gelijk OK */
+
+	return false;						/* ongelijk of geen */
 }
 
 global
@@ -220,12 +222,13 @@ bool inlist(FN *t, S_path *f, short ty)
 }
 
 static
-bool putflist(FN *t, S_path *f, short ty)
+bool putflist(PRJ *p, S_path *f, short ty)
 {
+	FN *t = &p->files.in;
 	if (!inlist(t, f, ty))
 	{
 		FCSOADL *last = t->last,
-		      *new;
+		        *new;
 
 		new = xmalloc(sizeof(*new), AH_KEEPFILE);
 		if (new)
@@ -238,7 +241,14 @@ bool putflist(FN *t, S_path *f, short ty)
 			else
 				t->ft = new;
 			t->last = new;
-			t->n += 1;
+
+#if NEWP
+			if (ty eq FTJ)
+				DIRcpy(&new->nest, f->s);
+			else
+#endif
+				t->n += 1;
+
 			return true;
 		}
 		else
@@ -248,97 +258,102 @@ bool putflist(FN *t, S_path *f, short ty)
 	return false;
 }
 
-void console(Cstr, ...);
+static
+bool is_exec(S_path *f)		/* 06'19 v6 */
+{
+	return   is_suf(f->s, sufs.app)
+		  or is_suf(f->s, sufs.prg)
+		  or is_suf(f->s, sufs.ttp)
+		  or is_suf(f->s, sufs.tos)
+		  or is_suf(f->s, sufs.ovl)
+   	;
+
+}
+
+void isses(void)
+{
+	send_msg("\n===================================================\n\n");
+}
+
+static
+void pr_prj(PRJ *j, short lvl)
+{
+	isses();
+	send_msg("%d>Listing of %s in %s\n", lvl, j->fn.s, j->pad.s);
+	isses();
+
+}
+
 /*
- *  keepfile(prj, f, l) - remember the filename 'f' in the appropriate place
+ *  Remember the filename 'f' in the appropriate place
  */
 static
-short keepfile(PRJ *prj, S_path *f, short level)
+short keep_file(short which, PRJ *prj, S_path *f, short level)
 {
 	if (f eq nil)
 		return 0;
+#if 0
+	if(SHL_cfg.v)
+		send_msg("%d>[%d]input file '%s'\n", level, which, f->s);
+	else
+		send_msg("%d>[%d]keep_file '%s', in.n = %d\n", level, which, f->s, prj->files.in.n);
+#endif
 
 	if (inq_xfs(f->s, nil) eq 0)
 		strupr(f->s);
 
-	if (*prj->files.op.s eq 0)  		/* first file is output */
+	if (*prj->files.op.s eq nil)					/* 06'19 HR: v6 output */
 	{
 		DIRcpy(&prj->files.op, f->s);
 		return 'p';
 	}
-
-	if (level eq -1)				/* start up code */
-	{
-		DIRcpy(&prj->files.up, f->s);
-		return 'o';
-	}
-	elif (findupsuf(f->s, ".x") eq ' ' )  /* geen suffix */
+	elif (getsuf(f->s) eq nil)  /* geen suffix */
 	{
 		S_path ps;
 		ps = change_suffix(f, sufs.c);
-		putflist(&prj->files.in, &ps, FTC);		/* default is .C */
+		putflist(prj, &ps, FTC);			/* default is .C */
 		return 'c';
 	}
-	elif (   findupsuf(f->s, sufs.app)
-	      or findupsuf(f->s, sufs.prg)
-	      or findupsuf(f->s, sufs.ttp)
-	      or findupsuf(f->s, sufs.tos)
-	   )
+	elif (is_suf(f->s, sufs.c) )
 	{
-		if (*prj->files.op.s)
-			send_msg("duplicate output file '%s'\n", f->s);
-		DIRcpy(&prj->files.op, f->s);
-		return 'p';
-	}
-	elif (findupsuf(f->s, sufs.c) )
-	{
-		putflist(&prj->files.in, f, FTC);
+		putflist(prj, f, FTC);
 		return 'c';
 	}
 #if FOR_A
-	elif (findupsuf(f->s, sufs.a) )
+	elif (is_suf(f->s, sufs.a) )
 	{
-		putflist(&prj->files.in, f, FTA);
+		putflist(prj, f, FTA);
 		return 'a';
 	}
-	elif (findupsuf(f->s, sufs.d) )
-	{
-		putflist(&prj->files.h, f, FTD);
-		return 'd';
-	}
 #endif
-	elif (findupsuf(f->s, sufs.h) )
-	{
-		putflist(&prj->files.h, f, FTH);
-		return 'h';
-	}
-	elif (findupsuf(f->s, sufs.s) )
+	elif (is_suf(f->s, sufs.s) )
 	{
 #if BIP_ASM
-		putflist(&prj->files.in, f, FTS);
+		putflist(prj, f, FTS);
 		return 's';
 #else
-		putflist(&prj->files.in, f, FTO);
+		putflist(prj, f, FTO);
 		return 'o';
 #endif
 	}
-	elif (findupsuf(f->s, sufs.o) )
+	elif (   is_suf(f->s, sufs.o  )
+   		  or is_suf(f->s, sufs.a  )
+		  or is_suf(f->s, sufs.lib)
+		  or is_suf(f->s, sufs.l  )
+	     )
 	{
-		putflist(&prj->files.in, f, FTO);
+		putflist(prj, f, FTO);
 		return 'o';
 	}
-	elif (   findupsuf(f->s, sufs.a)
-	      or findupsuf(f->s, sufs.lib)
-	      or findupsuf(f->s, sufs.l))
+#if NEWP
+	elif (is_suf(f->s, sufs.prj))
 	{
-		putflist(&prj->files.in, f, FTL);
-		return 'l';
+		putflist(prj, f, FTJ);
+		return 'j';
 	}
-	else
-	{
-		send_msg("%d>project: unknown file suffix '%s'\n", level, f->s);
-		return 0;
-	}
+#endif
+	send_msg("%d>[%d] project: unknown file suffix '%s'\n", level, which, f->s);
+	return 0;
 }
 
 global
@@ -385,8 +400,6 @@ void clear_project(PRJ *prj, short level)
 	{
 		PRJ *p = prj->first;
 
-/*		send_msg("%d>clear_project for %s\n", level, prj->files.op.s);
-*/
 		while (p)
 		{
 			PRJ *nx = p->next;
@@ -560,6 +573,7 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 #if ! BIP_CC || defined TTPSHELL
 	P_path pn;
 
+
 	pn.s = f;
 	cerf = change_suffix(pn.t, ".err");
 #endif
@@ -591,8 +605,8 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 #if C99
 	if (SHL_cfg.c99)					*opt++ = '9';		/* accept C99 syntax and implement if supplied twice */
 #endif
-	if (SHL_cfg.ac_cache_headers)  		*a_opt++ = 'c';		/* cache headers */
 	if (SHL_cfg.ag_nogoto)				*a_opt++ = 'g';		/* warn goto's */
+	if (SHL_cfg.ac_cache_headers)  		*a_opt++ = 'c';		/* cache headers */
 	if (SHL_cfg.af_func_tree)			*a_opt++ = 'f';		/* Function tree database */
 	if (SHL_cfg.ah_project_help) 		*a_opt++ = 'h';		/* project HELP */
 	if (SHL_cfg.ai_int32)				*a_opt++ = 'i';		/* default int is 32 bits */
@@ -603,15 +617,14 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 	if (SHL_cfg.aw_Xnl)					*a_opt++ = 'w';		/* default Xn is long (EmuTos) */
 #if DEBUG
 	if (SHL_cfg.al_list_stats)			*a_opt++ = 'l';		/* nodestats */
-	if (SHL_cfg.ad_new_peep)			*a_opt++ = 'd';		/* suppress newest peephole optimization */
-	if (SHL_cfg.ak_token_list)			*a_opt++ = 'k';		/* print token list */
+	if (SHL_cfg.ad_nopeep)				*a_opt++ = 'd';		/* suppress optimizer */
 	if (SHL_cfg.no_xy_debugging eq 0)
 	{
 		if (SHL_cfg.aa_debugging)  		*a_opt++ = 'a';
 		if (SHL_cfg.az_debugging) 		*a_opt++ = 'z';
 	}
 #endif
-/*	*a_opt++ = 't'; */
+
 #ifdef AH1
 		if (SHL_cfg.f2)					*a_opt++ = 'e';		/* suppress extracodes (ahcc_rt.h) */
 		if (SHL_cfg.f3)					*a_opt++ = 'r';		/* suppress registerization */
@@ -669,7 +682,8 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 		strcat(cmdln, o);
 	}
 
-	send_msg("\n****  Compiling %s\n", f);
+	send_msg("\n");
+	send_msg("%d>****  Compiling %s\n", prj->depth, f);
 
 	if (SHL_cfg.v)
 	{
@@ -695,6 +709,7 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 			sf = change_suffix(pn.t, sufs.s);
 			Fdelete(sf.s);
 */		}
+
 		return warn;
 	}
 
@@ -713,10 +728,10 @@ short docomp(PRJ *prj, char *f, char *o, bool asm)
 }
 
 static
-bool look_CC(FILE *fp, char *s, char *msg)
+bool look_CC(FILE *fp, char *s, char *prfx, char *msg)
 {
 	MAX_dir file;
-	char *t = delpad(s, mkpad.s);
+	char *t = delpad(s, prfx);
 	Cstr lb = get_libstr();
 
 #if CC_PATH
@@ -736,6 +751,26 @@ bool look_CC(FILE *fp, char *s, char *msg)
 	return true;
 }
 
+
+void pr_f(Cstr n, Cstr fn)
+{
+	char b[80];
+	FILE *f = fopen(n, "r");
+	if (f)
+	{
+		send_msg("==== List of '%s' of '%s' ====\n", n, fn);
+		while (fgets(b, 256, f) ne nil)
+		{
+			send_msg(b);
+		}
+
+		fclose(f);
+		send_msg("====  end of '%s' ====\n", n);
+	othw
+		send_msg("==== No '%s' ====\n", n);
+	}
+}
+
 /*
  * dold() - run the loader
  */
@@ -747,6 +782,9 @@ bool dold(PRJ *prj)
 	S_path ps;
 	char cmdln[4096];
 	short rep;
+	extern long bin_size;
+
+	mkpad = prj->pad;		/*	06'19 HR: v6 */
 
 	if (prj->files.in.n eq 0)
 	{
@@ -766,16 +804,7 @@ bool dold(PRJ *prj)
 		return false;
 	}
 
-	if (*prj->files.up.s)
-	{
-		char *up = prj->files.up.s;
-		if (isfile(up))
-			fprintf(fp, "%s\n", up);
-		elif (!look_CC(fp, up, "start up"))
-			return false;
-	}
-
-	if (prj->files.in.n)
+	if (prj->files.in.n ne 0)
 	{
 		FCSOADL *ft = prj->files.in.ft;
 
@@ -795,13 +824,10 @@ bool dold(PRJ *prj)
 					fprintf(fp, "%s\n", ps.s);
 				break;
 				case FTO:
-					fprintf(fp, "%s\n", ft->f.s);
-				break;
-				case FTL:			/* 04'09 preserve order */
 					s = ft->f.s;
 					if (isfile(s))
 						fprintf(fp, "%s\n", s);
-					elif (!look_CC(fp, s, "library"))
+					elif (!look_CC(fp, s, prj->pad.s, "library"))
 						return false;
 				break;
 			}
@@ -811,6 +837,8 @@ bool dold(PRJ *prj)
 
 	fclose(fp);
 
+/*	pr_f(LTMP, prj->fn.s);
+*/
 	prj->files.op = defofile(prj, &prj->files.op);
 
 	sprintf(cmdln, "%s%s%s%s %s %s %s %s %s %s %s %s %s -c=%s -o=%s",
@@ -833,7 +861,7 @@ bool dold(PRJ *prj)
 	               prj->files.op.s);
 
 	send_msg("\n****  Linking %s\n", prj->fn.s);
-	
+
 	if (SHL_cfg.v1 and strlen(cmdln) < 255)
 		send_msg("-= %s =-\n", cmdln);
 
@@ -845,10 +873,25 @@ bool dold(PRJ *prj)
 		return false;	/* Dont delete the LTMP */
 	}
 
-	send_msg("Output file: '%s'\n", prj->files.op.s);
+	if (bin_size)
+		send_msg("Output file: %s[%ld]\n", prj->files.op.s, bin_size);
+	else
+		send_msg("Output file: %s\n", prj->files.op.s);
 
 	Fdelete(LTMP);
+
 	return true;
+}
+
+static PRJ *find_prj(PRJ *p, Cstr f)
+{
+	while (p)
+	{
+		if (strcmp(p->fn.s, f) eq 0)
+			return p;
+		p = p->next;
+	}
+	return nil;
 }
 
 static
@@ -857,12 +900,15 @@ short make_prj(PRJ *prj, DPP dep, short level)
 	short l, anycomp = 0;
 	long fh;			/* 05'12 HR long V4.12 */
 	DOSTIME tp;
+#if ! NEWP
 	PRJ *p = prj->first;
+#endif
 	FCSOADL *ft;
 
 	tp.date = 0;
 	tp.time = 0;
 
+#if ! NEWP
 	while (p)
 	{
 		/* the new output is detected via makeok in the outer prj */
@@ -872,6 +918,10 @@ short make_prj(PRJ *prj, DPP dep, short level)
 		anycomp += r;		/* 03'09: pass it on */
 		p = p->next;
 	}
+#endif
+
+	depth = prj->depth;		/* 11'19 HR: v6 */
+	mkpad = prj->pad;		/* 06'19 HR: v6 */
 
 	if (*prj->files.op.s and (fh = Fopen(prj->files.op.s, 0)) > 0 )		/* 05'12 HR > 0 V4.12 */
 	{
@@ -882,23 +932,33 @@ short make_prj(PRJ *prj, DPP dep, short level)
 	ft = prj->files.in.ft;
 	while (ft)
 	{
+
+#if NEWP
+		if (ft->csol eq FTJ)
+		{
+			PRJ *p;
+			short r;
+			p = find_prj(root_project.first, ft->f.s);
+			if (p)
+			{
+				r = make_prj(p, dep, level + 1);
+				if (r eq -1)
+					return -1;		/* errors */
+				anycomp += r;		/* 03'09: pass it on */
+			}
+		}
+		else
+#endif
+
+		if (   ft->csol eq FTC
+#if BIP_ASM
+		    or ft->csol eq FTS
+#endif
+
 #if FOR_A
-		if (   ft->csol eq FTC
-#if BIP_ASM
-		    or ft->csol eq FTS
-#endif
 		    or ft->csol eq FTA
-		   )
-#elif BIP_ASM
-		if (   ft->csol eq FTC
-#if BIP_ASM
-		    or ft->csol eq FTS
 #endif
 		   )
-#else
-		if (   ft->csol eq FTC
-		   )
-#endif
 		{
 			bool make = false;
 			Cstr m = get_matchstr();
@@ -957,7 +1017,6 @@ void domake(PRJ *prj, bool msg)
 			if (msg)
 				send_msg("\nPRJ make %s\n", mkfn.s);
 		}
-
 		anycomp = make_prj(prj, dep, 0);		/* recursive make */
 		if (anycomp eq 0)
 			send_msg("make: everything seems to be OK\n");
@@ -978,6 +1037,7 @@ void clear_dates(PRJ *prj, short level)
 	}
 
 	ft = prj->files.in.ft;
+
 	while (ft)
 	{
 		if (   ft->csol eq FTC
@@ -1082,6 +1142,36 @@ void alert_braces(char *to, char *fro)
 	*to = 0;
 }
 
+#define SK s = spit(s)
+static
+uchar *spit(uchar *s)
+{
+	while (*s eq ' ') s++;
+	return s;
+}
+
+static
+bool is_opt(uchar *s, uchar c)	/* 10'19 HR: v6 */
+{
+	if (s)
+	{
+		SK;
+		while (*s eq '-')
+		{
+			s++;
+			SK;
+			while (is_alpha(*s))
+			{
+				if (tolower(*s) eq tolower(c))
+					return true;
+				s++;
+			}
+			SK;
+		}
+	}
+	return false;
+}
+
 static
 bool load_prj(PRJ *prj, char *f, short level)
 {
@@ -1092,9 +1182,14 @@ bool load_prj(PRJ *prj, char *f, short level)
 	long Coptl = 0, Soptl = 0, Loptl = 0;
 	bool started = true;
 
-	DIRcpy(&prj->fn, f);
+	prj->depth = level;
 
+	if (SHL_cfg.v)
+		send_msg("%d>loading project file '%s'\n", level, f);
+
+	DIRcpy(&prj->fn, f);
 	make_path(&prj->pad, f);
+	mkpad = prj->pad;
 
 	if (SHL_cfg.opt_inherit and prj->parent)			/* 03'09: inherit options from parent project */
 	{
@@ -1146,7 +1241,13 @@ bool load_prj(PRJ *prj, char *f, short level)
 				elif (c eq 'S' or c eq 's')
 					skc(), Soptl = add_options(&s, &prj->makeSoptions, Soptl, level);
 				elif (c eq 'L' or c eq 'l')
-					skc(), Loptl = add_options(&s, &prj->makeLoptions, Loptl, level);
+				{
+					skc();
+					Loptl = add_options(&s, &prj->makeLoptions, Loptl, level);
+					if (is_opt((uchar *)prj->makeLoptions, 'j'))
+						prj->makeLib = true;
+
+				}
 			}
 			elif (c eq '=')
 				started = false;
@@ -1162,15 +1263,11 @@ bool load_prj(PRJ *prj, char *f, short level)
 				if (!started)
 				{
 					started = true;
-
-					if (level eq 0 and findupsuf(fnm.s, ".o") eq 'o')
-					{
-						keep = keepfile(prj, &ps, -1);
-						continue;
-					}
+					keep = keep_file(1, prj, &ps, level);
+					continue;
 				}
 
-				if (findupsuf(ps.s, ".prj") eq 'p')			/* nested project */
+				if (is_suf(ps.s, ".prj"))			/* nested project */
 				{
 					PRJ *new = xcalloc(1, sizeof(*new), AH_NEW_PRJ);
 					if (new)
@@ -1183,17 +1280,25 @@ bool load_prj(PRJ *prj, char *f, short level)
 							prj->last->next = new;
 						prj->last = new;
 						load_prj(new, ps.s, level + 1);
-						keep = keepfile(prj, &new->files.op, level);
+						if (new->makeLib)
+							keep = keep_file(2, prj, &new->files.op, level);
+#if 1
+						keep = keep_file(3, prj, &ps, level);
+#endif
+#if 0 /* NEWP */
+						Cconin();
+#endif
 					}
 					else
 						send_msg("%d>%s\n", level, ranout);
 				}
 #if ! BIP_CC
-				keep = keepfile(prj, &ps, level);
+				keep = keep_file(4, prj, &ps, level);
 #else
-				elif ((keep = keepfile(prj, &ps, level)) ne 0)
+				elif ((keep = keep_file(5, prj, &ps, level)) ne 0)
 				{
-					DPP rp = pdb_find(prj_dependencies, ps.s);
+					DPP rp;
+					rp = pdb_find(prj_dependencies, ps.s);
 					if (!rp)
 					{
 						rp = pdb_new(&prj_dependencies, ps.s);
@@ -1253,7 +1358,6 @@ bool load_prj(PRJ *prj, char *f, short level)
 	}
 
 	fclose(fp);
-
 	return keep|true;		/* keep used */
 }
 
@@ -1262,10 +1366,6 @@ void loadmake(char *f, bool clean)
 {
 	DIRcpy(&mkfn, f);
 
-	if (SHL_cfg.v)
-		send_msg("Loading project file %s\n", f);
-	make_path(&mkpad, f);
-
 #if BIP_CC
 	if (auto_dependencies)
 		pdb_write_dep();
@@ -1273,6 +1373,7 @@ void loadmake(char *f, bool clean)
 
 	remove_project();
 	zero(root_project);
+
 #ifdef GEMSHELL
 	menu_prj(nil);
 #endif
@@ -1289,9 +1390,6 @@ void loadmake(char *f, bool clean)
 #ifdef GEMSHELL
 		menu_prj(getfn(mkfn.s));
 #endif
-		if (SHL_cfg.v)
-			send_msg("loaded project from: %s\n", f);
-
 
 #if BIP_CC
 		high_prj = filecount;
@@ -1326,15 +1424,15 @@ void do_compile(PRJ *prj, char *f)
 {
 	if (f)
 	{
-		if (    tolower(findupsuf(f, sufs.c)) ne 'c'
-		    and tolower(findupsuf(f, sufs.s)) ne 's'
+		if (    !is_suf(f, sufs.c)
+		    and !is_suf(f, sufs.s)
 #if FOR_A
-			and tolower(findupsuf(f, sufs.a)) ne 'a'
+			and !is_suf(f, sufs.a)
 #endif
 		   )
 			return;
 
-		docomp(prj, f, nil, tolower(findupsuf(f, sufs.s)) eq 's');
+		docomp(prj, f, nil, is_suf(f, sufs.s));
 	}
 }
 
@@ -1356,8 +1454,6 @@ Cstr save_string(void)
 global
 void end_shell(void)
 {
-	VpV free_dictionary;
-
 	if (    (SHL_cfg.aj_auto_depend or SHL_cfg.ah_project_help)
 	    and (   (auto_dependencies and dep_changed)
 	         or (fun_dependencies and dep_changed)
@@ -1367,11 +1463,9 @@ void end_shell(void)
 		send_msg("\n**** %s %s, please wait\n", save_string(), depfn.s);
 		pdb_write_dep();
 	}
-	remove_project();
 
-#if BIP_CC && __COLDFIRE__
 	free_dictionary();
-#endif
+	remove_project();
 }
 
 global
@@ -1529,18 +1623,16 @@ short main(short argc, char *argv[])
 			prj.s = argv[i];
 	}
 
-#if __COLDFIRE__
-/*	send_msg("TTP shell: init dictionary\n"); */
-	init_dictionary();
-#endif
-	tok_init();
-	init_dir(0);		/* 0 = TOS */
 
 	pdb_init();
 
 	if (prj.s)
 	{
 		DIRcpy(&mkfn, prj.s);
+
+		init_dictionary();
+		tok_init();
+		init_dir(0, nil);		/* 0 = TOS, nil = not GEM */
 
 		loadmake(mkfn.s, 0);
 
@@ -1552,7 +1644,6 @@ short main(short argc, char *argv[])
 		else
 			domake   (&root_project, true);
 		end_shell();
-		free_cache();
 		return wait_exit(0);
 	othw
 		send_msg("needs name of project file\r\n");
@@ -1599,7 +1690,7 @@ short main(short argc, char *argv[])
 		else
 			prj.s = argv[i];
 
-	init_dir(0);		/* 0 = TOS */
+	init_dir(0, nil);		/* 0 = TOS, nil = not GEM */
 
 	remove_project();
 

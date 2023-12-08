@@ -23,7 +23,6 @@
  *	window library for GEM programs using IT.
  */
 
-
 #include <string.h>
 #include <limits.h>
 
@@ -37,6 +36,7 @@
 
 void send_msg  (char *text, ...);
 void send_msg_n(char *text, ...);
+
 #ifdef COFT
 #include "treeview.h"
 #endif
@@ -332,19 +332,29 @@ void set_X(IT *w)
 global
 void set_V(IT *w)
 {
-	if (w->wks.Ver)
+	switch (w->wks.Ver)
 	{
-		if (w->title.v ne 'N')
-		{
-			w->title.v = 'N';
-			wi_title(w);
-		}
-	othw						/* 07'17 HR */
+		case 0:						/* 07'17 HR */
 		if (w->title.v ne 'O')
 		{
 			w->title.v = 'O';
 			wi_title(w);
 		}
+		break;
+		case 1:
+		if (w->title.v ne 'N')
+		{
+			w->title.v = 'N';
+			wi_title(w);
+		}
+		break;
+		case 2:
+		if (w->title.v ne 'T')
+		{
+			w->title.v = 'T';
+			wi_title(w);
+		}
+		break;
 	}
 }
 #endif
@@ -418,8 +428,8 @@ void snapwindow(IT *w,RECT *sn)
 		/* difference with CHAR_BIT of the little margin
 			included in mg that makes the w not mult of CHAR_BIT
 			to keep it free from left screen edge */
-		if (w->mgw.x or nx <= 0)
-			nx+=CHAR_BIT-(w->mgw.x mod CHAR_BIT);
+		if (w->mg.w or nx <= 0)
+			nx+=CHAR_BIT-(w->mg.w mod CHAR_BIT);
 		sn->x=nx + w->v.x;
 	}
 
@@ -432,15 +442,15 @@ void snapwindow(IT *w,RECT *sn)
 	   and NOT differences as in w->v
 	*/
 
-	nw=sn->w - w->v.w - w->mgw.x - w->mgw.w;
+	nw=sn->w - w->v.w - w->mg.w;
 	nw/=w->unit.w;
 	nw*=w->unit.w;
-	sn->w=nw + w->v.w + w->mgw.x + w->mgw.w;
+	sn->w=nw + w->v.w + w->mg.w;
 
-	nh=sn->h - w->v.h - w->mgw.y - w->mgw.h;
+	nh=sn->h - w->v.h - w->mg.h;
 	nh/=w->unit.h;
 	nh*=w->unit.h;
-	sn->h=nh + w->v.h + w->mgw.y + w->mgw.h;
+	sn->h=nh + w->v.h + w->mg.h;
 }
 
 global
@@ -467,6 +477,20 @@ global
 
 RECT
 nomargin = {0,0,0,0};
+
+global
+void w_vhl(IT *w, short vhl)
+{
+	if (w)
+	{
+		if   (vhl  > 0)
+			w->vhl = vhl;			/* 07'20 HR v6: use given handle */
+		elif (vhl  < 0)				/* 07'20 HR v6: open a workstation for this window */
+			w->vhl = deskw.vhl;
+		else
+			w->vhl = open_vwk(1,w->title.t, nil, nil);
+	}
+}
 
 global
 IT *create_IT(
@@ -519,7 +543,9 @@ IT *create_IT(
 				void *		bitmap,
 				long		mapl,
 				WH    		unit,
+				short		vhl,		/* 06'20 HR v6 */
 				short 		points,
+				short		minmargin,
 				MARGIN		do_margin
 			)
 {
@@ -558,7 +584,7 @@ IT *create_IT(
 		w->map  = bitmap;
 		w->mapl = mapl;
 		w->points = points;
-		w->mgw.x = MINMARGIN;
+		w->mg.w = minmargin;
 		w->do_margin = do_margin;
 		w->op = false;	/* open komt later */
 		w->wh = wh;		/* bovendien genereert wind_open een redraw event  */
@@ -668,15 +694,12 @@ IT *create_IT(
 		w->cinf_upd = co;
 		w->upd_cinf = ci;
 		w->muisvorm= amouse;
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 		w->loc     = deskw.loc;		/* local options */
 #endif
-		w->hl      = scr.hl; /* deskw.hl; */
+		w->vhl     = virt_handle;
 		w->fullw   = deskw.fullw;	/* default sizes */
-#ifdef PRINFO				/* use only for diagnosis of windows.c itself */
-		print_it(w,"create");
-#endif
-		w->color = BLACK;	/* selection color default */
+		w->color   = BLACK;	/* selection color default */
 	}
 	return w;
 }
@@ -713,42 +736,26 @@ SCRL_VAL h_and_v		/* IT *w, short *hv, short *vv, short *htv,short *vtv */
 global
 void clear_all_margins(IT *w)
 {
-	short ywh=w->wa.y+w->wa.h-1,
-	      xww=w->wa.x+w->wa.w-1,
-	      ymh=w->ma.y+w->ma.h-1,
-	      xmw=w->ma.x+w->ma.w-1;
-
-	if (w->mgw.x)
-		pbox(w->hl, w->wa.x,
+	if (w->mg.w)
+		pbox(w->vhl,w->wa.x,
 				    w->wa.y,
 				    w->ma.x-1,
-				    ywh);
-	if (w->mgw.w)
-		pbox(w->hl, xmw+1,
+				    w->wa.y+w->wa.h-1);
+	if (w->mg.h)
+		pbox(w->vhl,w->ma.x,
 				    w->wa.y,
-				    xww,
-				    ywh);
-	if (w->mgw.y)
-		pbox(w->hl, w->ma.x,
-				    w->wa.y,
-				    xmw,
+				    w->ma.x+w->ma.w-1,
 				    w->ma.y-1);
-	if (w->mgw.h)
-		pbox(w->hl, w->ma.x+1,
-				    ymh+1,
-				    xmw,
-				    ywh);
 }
 
 global
 void clear_margin(IT *w)
 {
-	if (w->mgw.x)
-		pbox(w->hl,w->wa.x,
-				   w->wa.y,
-/*				  (w->wa.x+w->unit.w) & 0xfff8,
-*/		           w->wa.x+w->mgw.x,			/* 06'14 v5.1 */
-				   w->ma.y+w->ma.h-1);
+	if (w->mg.w)
+		pbox(w->vhl,w->wa.x,
+				    w->wa.y,
+		            w->wa.x+w->mg.w,			/* 06'14 v5.1 */
+				    w->ma.y+w->ma.h-1);
 }
 
 global
@@ -756,18 +763,20 @@ void get_work(IT *w)
 {
 	wind_get(w->wh,WF_WORKXYWH,&w->wa.x,&w->wa.y,&w->wa.w,&w->wa.h);
 
-	w->ma.x=w->wa.x + w->mgw.x;
-	w->ma.w=w->wa.w - w->mgw.x - w->mgw.w;
-	w->ma.y=w->wa.y + w->mgw.y;
-	w->ma.h=w->wa.h - w->mgw.y - w->mgw.h;
+	w->ma.x=w->wa.x + w->mg.w;
+	w->ma.w=w->wa.w - w->mg.w;
+	w->ma.y=w->wa.y + w->mg.h;
+	w->ma.h=w->wa.h - w->mg.h;
 	w->inf.x=w->wa.x+w->unit.w;
 	w->inf.y=w->wa.y-(INFO_H-1);
 	w->inf.w=w->rem.w;
 	w->inf.h=(w->wkind&INFO) ? INFO_H-1 : 0;
+
 #if WINDIAL or WIN_OB
 	via (w->dial.place)(w);
 	wdial_edob(w, w->dial.edob);
 #endif
+
 #ifdef WMENU
 	if (w->draw_menu)
 	{
@@ -781,6 +790,7 @@ void get_work(IT *w)
 		w->ma.h-=w->men.h;
 	}
 #endif
+
 	w->norm.sz.w=w->ma.w/w->unit.w;
 	w->norm.sz.h=w->ma.h/w->unit.h;
 
@@ -797,7 +807,7 @@ void get_work(IT *w)
 global
 void close_w(IT *w)
 {
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 	if (w->loctab)
 		xfree(w->loctab);
 #endif
@@ -809,6 +819,13 @@ void close_w(IT *w)
 		if (w->op)
 			wind_close (w->wh);
 		wind_delete(w->wh);
+#if VWWL	/* 06'20 HR v6 */
+		if (w->vhl > 0 and w->vhl ne deskw.vhl and  w->vhl ne virt_handle)
+		{
+			v_clsvwk(w->vhl);
+			w->vhl = -1;
+		}
+#endif
 	}
 	w->op=false;
 	w->wh=-1;
@@ -817,20 +834,10 @@ void close_w(IT *w)
 global
 short open_w(IT *w)
 {
-#if INTERNAL
-	IT *ww=get_it(w->wh,-1);		/* make current */
-	if (ww ne w)
-	{
-		(*alert_cur)(1,"[1][ open_w: | lost IT | ][ Oei ]");
-		return -1;
-	}
-	if (w->wh <= 0)
-	{
-		(*alert_cur)(1,"[1][ open_w: | needs create | ][ Oei ]");
-		return -1;
-	}
-#else
 	get_it(w->wh,-1);				/* make current */
+#if VWWL
+	if (!w->vhl)
+		w_vhl(w, 0);
 #endif
 	wi_title(w);
 	if (w->wkind&INFO)
@@ -839,6 +846,9 @@ short open_w(IT *w)
 	wind_set(w->wh,WF_VSLIDE, w->vslp);
 	wind_set(w->wh,WF_HSLSIZE,w->hsls);
 	wind_set(w->wh,WF_HSLIDE, w->hslp);
+#ifdef WMENU
+	w->menu->vhl = w->vhl;		/* 07'20 HR: v6 */
+#endif
 	w->op = wind_open(w->wh, w->rem.x, w->rem.y, w->rem.w, w->rem.h) ne 0;
 	if (w->op)
 	{
@@ -850,10 +860,6 @@ short open_w(IT *w)
 		via (w->slider)(w);		/* If you could only know them after get_work() */
 #if WINDIAL
 		set_dialinfs(w);
-#endif
-#ifdef WMENU
-		if (w->draw_menu)
-			menu_redraw(w, w->men);
 #endif
 	}
 	return w->op;
@@ -924,7 +930,6 @@ SLIDER v_slider		/* IT *w */  /* standard  */
 		h_slider(w);
 }
 
-
 global
 REDRAW do_redraw	/* (IT *w,RECT t2) */
 {
@@ -933,7 +938,7 @@ REDRAW do_redraw	/* (IT *w,RECT t2) */
 
 	if (!w)
 		return;
-	hl=w->hl;
+	hl=w->vhl;
 
 	wind_get(w->wh,WF_FIRSTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
 
@@ -951,43 +956,24 @@ REDRAW do_redraw	/* (IT *w,RECT t2) */
 				if (w->dial.ob[w->dial.item].type eq G_IBOX)
 					gspbox(hl,w->wa);
 				wdial_off(w);
-			    draw_ob(w->dial.ob,w->dial.item,t1,3);
+			    draw_ob(w->dial.ob,w->dial.item,t1);
 				wdial_on(w);
 			}
 	#endif
+#ifdef WMENU
 			if (w->draw_menu) pbox(hl,w->wa.x,w->men.y,w->wa.x+wchar-1,w->men.y+w->men.h-1);
 			via (w->postdraw) (w,t1);
-			via (w->draw_menu)(w->menu,w->men,t1);
+			if (w->draw_menu)
+			{
+				w->menu->vhl = hl;
+				w->draw_menu(w->menu,w->men,t1);
+			}
+#endif
 		}
 		wind_get(w->wh,WF_NEXTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
 	}
 
-	gsclip(hl,ON,scr_grect);	/* whole screen */
-}
-
-global
-REDRAW menu_redraw /* (IT *w,RECT t2) */
-{
-	RECT t1;
-	short hl;
-
-	if (!w)
-		return;
-	hl=w->hl;
-
-	wind_get(w->wh,WF_FIRSTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
-	while (t1.w and t1.h)
-	{
-		if (rc_intersect(&t2,&t1))
-		{
-			gsclip(hl,ON,t1);
-			if (w->draw_menu) pbox(hl,w->wa.x,w->men.y,w->wa.x+wchar-1,w->men.y+w->men.h-1);
-			via (w->draw_menu)(w->menu,w->men,t1);
-		}
-		wind_get(w->wh,WF_NEXTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
-	}
-
-	gsclip(hl,ON,scr_grect);	/* whole screen */
+	gsclip(hl,ON,screct);	/* whole screen */
 }
 
 global
@@ -1002,7 +988,7 @@ void redraw_windows(INFO_T ty)
 	{
 		w=ws->wit;
 		if (w->ty eq ty)
-			do_redraw(w,scr_grect);
+			do_redraw(w,screct);
 		ws=stmfinext(&winbase);
 	}
 
@@ -1014,7 +1000,7 @@ STMNR bounce(IT *w, STMNR top)		/* bounce top if bottom appears in window */
 	if (w->view.sz.h < w->norm.sz.h)
 		top = 0;
 	elif (top+w->norm.sz.h > w->view.sz.h)
-		top = w->view.sz.h - w->norm.sz.h;		/* bounce poper */
+		top = w->view.sz.h - w->norm.sz.h;		/* bounce proper */
 
 	if (top < 0)
 		top = 0;
@@ -1035,14 +1021,12 @@ ARROWD arrow_img
 	via (w->winfo)(w);
 }
 
-/*	alert_text(" (1) v %d vt %d y %ld, top %ld", v, vt, w->norm.pos.y, top);	*/
-
 global
 ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 {
 	short h, v, ht, vt;
 	STMNR top = w->norm.pos.y;
-#if FASTRACK  && (WINTEXT || BINARY)
+#if FASTRACK  && (WINTEXT || BINED)
 	MFDB van  = {nil};
 	MFDB naar = {nil};
 
@@ -1106,7 +1090,7 @@ ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 			if (w->norm.pos.y ne top)
 			{
 				via (w->slider)(w);
-#if !FASTRACK || !(WINTEXT || BINARY)
+#if !FASTRACK || !(WINTEXT || BINED)
 				do_redraw(w,w->wa);
 #else
 				if (!topw or is_beyond_scr(w) or !(is_text(w) or is_bin(w)))
@@ -1119,7 +1103,7 @@ ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 					pxy[5] = w->wa.y+disp*w->unit.h;	/*  naar y1 */
 					pxy[7] = yplush;					/*	     y2	*/
 					hidem;
-					vro_cpyfm(w->hl, S_ONLY, pxy, &van, &naar);
+					vro_cpyfm(w->vhl, S_ONLY, pxy, &van, &naar);
 					showm;
 					via (w->lines)(w, disp);			/* new top to old top */
 				}
@@ -1133,7 +1117,7 @@ ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 			if (w->norm.pos.y ne top)
 			{
 				via (w->slider)(w);
-#if !FASTRACK || !(WINTEXT || BINARY)
+#if !FASTRACK || !(WINTEXT || BINED)
 				do_redraw(w,w->wa);
 #else
 				if (!topw or is_beyond_scr(w) or !(is_text(w) or is_bin(w)))
@@ -1146,10 +1130,9 @@ ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 					pxy[5]= w->wa.y;					/*	naar y1	*/
 					pxy[7]= yplush+disp*w->unit.h;	/*       y2 */
 					hidem;
-					vro_cpyfm(w->hl, S_ONLY, pxy, &van, &naar);
+					vro_cpyfm(w->vhl, S_ONLY, pxy, &van, &naar);
 					showm;
-/*	alert_text(" DN vt disp %d %d y %ld | top %ld", disp, vt, w->norm.pos.y, top);
-*/					via (w->lines)(w, disp);				/* old bot to new bot */
+					via (w->lines)(w, disp);				/* old bot to new bot */
 				}
 #endif
 			}
@@ -1185,9 +1168,6 @@ ARROWD arrowwindow	/* (IT *w,short arrow, bool topw) */
 		if (w->norm.pos.x ne old)
 			do_redraw(w,w->wa);
 	}
-#ifdef PRINFO
-	print_it(w,"arrowwindow");
-#endif
 }
 
 #if IMGS
@@ -1401,9 +1381,6 @@ SIZED sizewindow	/* (IT *w, RECT *to) */
 #endif
 		do_redraw(w,w->wa);		/* allways if WINX */
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w,"sizewindow");
-#endif
 }
 
 global
@@ -1416,9 +1393,6 @@ MOVED movewindow	/* (IT *w, RECT *to) */
 	wind_set(w->wh,WF_CURRXYWH,w->rem);
 	get_work(w);
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w,"movewindow");
-#endif
 }
 
 global
@@ -1437,9 +1411,6 @@ FULLED fullwindow	/* (IT *w) */
 	w->norm.pos.y  = bounce(w,w->norm.pos.y);
 	via (w->slider)(w);
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w,"fullwindow");
-#endif
 }
 
 global
@@ -1492,7 +1463,7 @@ void rack_up(IT *w, STMNR oldy)
 		pxy[5] = clip.y+disp*w->unit.h;		/*  naar y1 */
 		pxy[7] = yplush;					/*	     y2	*/
 		hidem;
-		vro_cpyfm(w->hl,S_ONLY,pxy,&van,&naar);
+		vro_cpyfm(w->vhl,S_ONLY,pxy,&van,&naar);
 		showm;
 		clip.h = disp*w->unit.h;
 	}
@@ -1524,7 +1495,7 @@ void rack_dn(IT *w, STMNR oldy)
 		pxy[5] = clip.y;					/*	naar y1	*/
 		pxy[7] = yplush+disp*w->unit.h;		/*       y2 */
 		hidem;
-		vro_cpyfm(w->hl,S_ONLY,pxy,&van,&naar);
+		vro_cpyfm(w->vhl,S_ONLY,pxy,&van,&naar);
 		showm;
 		clip.y = pxy[7];
 		clip.h = -disp*w->unit.h;
@@ -1569,10 +1540,6 @@ SLIDE slidewindow	/* (IT *w,short hslp,short vslp, bool topw) */
 			do_redraw(w,w->wa);
 	}
 	via (w->winfo)(w);
-
-#ifdef PRINFO
-	print_it(w,"slidewindow");
-#endif
 }
 
 global

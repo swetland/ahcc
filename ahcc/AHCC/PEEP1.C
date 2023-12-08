@@ -220,22 +220,7 @@ bool not_cc(IP ip, BP bp)
 		return bp->cond eq nil;		/* last instruction and no conditional block */
 }
 
-global
-bool is_number(const OPND *op)
-{
-	if (op)						/* 12'09 HR: stupid Milan!!! */
-
-	if (MM(op->am) eq ABS)
-	{
-		Cstr s = op->astr;
-		if (s eq nil) return true;		/* 12'09 HR: then already in op->disp */
-		if (isdigit(s[0]))
-			return true;
-		if (s[0] eq '-' and isdigit(s[1]))
-			return true;
-	}
-	return false;
-}
+bool is_number (const OPND *op);
 
 static
 bool any_number(IP ip)
@@ -621,7 +606,7 @@ ipeep1(BP bp, IP ip)
 	}
 #endif
 
-	if (op1 eq REGL)
+	if (op1 eq RGL)
 	{
 		RMASK m = loclist & anywhere_used;
 
@@ -689,7 +674,7 @@ peep1(BP bp)
 		{
 			next_ip = ip->next;
 
-			if (ip->opcode eq REGL)
+			if (ip->opcode eq RGL)
 			{
 				loclist = get_locs(ip);
 

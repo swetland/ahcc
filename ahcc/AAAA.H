@@ -9,7 +9,7 @@
  *
  * AHCC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNxESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -35,17 +35,15 @@
 #endif
 
 #include "common/win_menu.h"	/* also sets WMENU */
-#include "wi_types.h"			/* VOOR ahcc_stm & windows.h */
-#include "common/stm.h"
+#include "aaaa_win.h"			/* VOOR ahcc_stm & windows.h */
 #include "common/windows.h"
 
 #define WINX 1		/* do force redraw na bounce */
-#define TESTUNDO 0
 
 /* Readme: aaaa.txt */
 
 #define noPRINFO
-#define INTERNAL 0			/* do internal errors */
+#define INTERNAL 0   /* do internal errors */
 #define noCURKADER
 #define SERIALSTM
 #define get_tedinfo(o,i) o[i].spec.tedinfo
@@ -106,6 +104,14 @@
 #define wdial_off(w)
 #endif
 
+#if 0
+#define TRACE(a)  form_alert(1,"[0][-=" #a "=-][OK|NO]");
+#define TREES(a)  alert_text("-= %d =-", a);
+#else
+#define TRACE(a)
+#define TREES(a)
+#endif
+
 #if __AHCC__
 #define TR(a,b)
 #else
@@ -127,9 +133,7 @@ short Pdomain(short);
 extern char obty[][12],
 			lost_cw[],
 			prg_name[];
-extern short v_hl, a_hl, points, hpoints,
-			aes_keycode, aes_keycode, aes_keystate,
-			wchar, hchar;
+extern short points, hpoints, aes_keycode, aes_keystate, wchar, hchar;
 extern STMDEF winbase;
 extern STBASE *txtfreebase;
 extern IT deskw, *dirw;
@@ -152,19 +156,8 @@ short 	eruit			(short r);
 MENU_DO do_menu;
 void	w_top			(short mn, IT *w, IT *wt);
 short 	alert_msg		(char *t, ... );		/* via alert_cur */
-short 	alert_text		(char *t, ... );		/* always form_alert */
 void 	mem_alert		(char *op1, char *op2);
 void *	mmalloc			(long l,char *op1,char *op2, short key);
-char *	qfind			(long kl,uchar *pc, uchar *pc0,uchar *key, uchar *td1, uchar *nxtkey);
-char *	qfind_nc		(long kl,uchar *pc, uchar *pc0,uchar *key, uchar *td1, uchar *nxtkey);
-void	qfind_prepare	(long l,uchar *key,uchar *k,uchar *d);
-char *	qpfind			(uchar *, uchar *);
-char *	qpfind_nc		(uchar *, uchar *);
-void	qpfind_prepare	(long l,uchar *key);
-void	f_txt			(short hs,short x,short y,char *text);
 IT *	get_second		(IT *w, WSELECT *sel);
-
-VpI		pr_cache;
-void check_cache(short which, const char *s);
 
 #endif

@@ -26,7 +26,7 @@
 
 #include <stdio.h>
 
-#include "wi_types.h"
+#include "aaaa_win.h"
 #include "common/stm.h"
 #include "common/win_menu.h"
 
@@ -35,10 +35,10 @@
 #define wwv     deskw.v
 #define INFO_H  (hchar+hchar/8)
 #define MENU_M	w->menu
-#define MENU_H  MENU_M->m[1].h
+#define MENU_H  MENU_M->m[1].h+1
 #define KIND    (NAME|     MOVER|CLOSER|FULLER|SIZER|VSLIDE|UPARROW|DNARROW|HSLIDE|LFARROW|RTARROW)
 #define WKIND   KIND
-
+/*
 typedef struct position
 {
 	short x; long y;
@@ -54,7 +54,7 @@ typedef struct a_rect
 	POS pos;
 	SZ  sz;
 } A_RECT;
-
+*/
 typedef struct cursorinfo
 {
 	POS pos;			/* cursor pos in data */
@@ -81,7 +81,7 @@ typedef bool MENU_DO	(struct it *w,OBJECT *m,short title,short choice, short kst
 typedef void MENU_SET	(struct it *w);
 typedef bool FCLOSE		(struct it *w,bool force);
 typedef void SCRL_VAL	(struct it *w, short *hv, short *vv, short *htv, short *vtv);
-
+typedef void COLUMN		(struct it *w);
 
 typedef struct view_state
 {
@@ -134,7 +134,7 @@ typedef struct it
 	MENU_DO *	do_menu;
 	MENU_SET *	set_menu;
 	FCLOSE *	close_file;	/* if menu action different from window closebox	*/
-	SELECT *	select;		/* selection										*/
+	SELECT *	select;		/*  selection										*/
 	DESELECT *	deselect;	/*  The opposite									*/
 	XSELECT *	wselect;	/*  The actual writing (with the parameters NOT explicitely from IT) */
 	CURSOR *	cursor;		/*  cursor draw function									*/
@@ -144,6 +144,9 @@ typedef struct it
 	DRAG_SEL *	drag;		/*  what to do for dragging a selection				*/
 	CINFI *		upd_cinf;	/*  Was: t_to_s_f */
 	CINFO *		cinf_upd;	/*	Was: f_to_s_t */
+#if KOLM
+	COLUMN *	column;		/* redraw column (sheets ) */
+#endif
 						/* ----    general     ----							*/
 	A_RECT
 		norm,			/* window content e.g. lines/columns (units of scroll)	*/
@@ -159,7 +162,7 @@ typedef struct it
 	short
 		wh,				/* window handle									*/
 		fl,				/* file handle										*/
-		hl;				/* VDI handle										*/
+		vhl;			/* VDI handle										*/
 
 	M_S *	menu;		/* menu_bar for window menu							*/
 	bool
@@ -214,8 +217,8 @@ typedef struct it
 		ma,				/*                  my work area					*/
 		rem,			/*                  remember						*/
 		frem,			/*                      "    fulled					*/
-		nfrem,			/*                      "    unfulled				*/
-		mgw;			/*                  margin   widths					*/
+		nfrem;			/*                      "    unfulled				*/
+	WH	mg;				/*                  margin widths					*/
 	long
 		magic1;
 	struct
@@ -318,7 +321,7 @@ typedef struct it
 	} dial;
 #endif
 
-#if defined GEMSHELL || TEXTFILE || BINARY
+#if defined GEMSHELL || TEXTFILE || BINED
 	void *loctab;
 #endif
 						/* ----    specific for work sheets    ----			*/
@@ -337,7 +340,7 @@ typedef struct it
 #endif
 						/* ----    specific for mandelbrot      ---- 		*/
 #ifdef MFRAC
-	void *s;			/* veel extra info 									*/
+	void *s;			/* veel extra info									*/
 	bool overscan;
 #endif
 
@@ -351,7 +354,7 @@ typedef struct it
 	} img;
 #endif
 						/* ----    specific for binary editor  ---- 		*/
-#ifdef BINARY
+#ifdef BINED
 	struct binary
 	{
 		long cur;			/* file position of cursor							*/
@@ -423,12 +426,6 @@ typedef struct it
 	} con;
 #endif
 	bool lsto;				/* lines have been stored, redraw is needed			*/
-#ifdef FMENU
-	struct fsview
-	{
-		long dmap;
-	} fsv;
-#endif
 	long magic2;
 } IT;
 #endif
@@ -461,7 +458,7 @@ IT *	get_it			(short h, INFO_T t);
 IT *	is_it			(IT *w);
 IT *	get_top_it		(void);
 IT *	get_fn_it		(Cstr fn);
-REDRAW	do_redraw, menu_redraw;
+REDRAW	do_redraw;
 VpV		to_top,
 		to_bottom;
 STMNR	bounce			(IT *w,STMNR top);
@@ -534,7 +531,9 @@ IT *	create_IT	(	bool   with_w,
 						void * bitmap,
 						long   mapl,
 						WH unit,
+						short vhl,		/* 07'20 HR v6 */
 						short  w_points,
+						short minmargin,
 						MARGIN do_margin);
 
 void	update_it		(bool app, INFO_T ty);

@@ -111,7 +111,8 @@
 #define MNJVOLAT         6   /* STRING in Baum JOURNAL */
 #define MNJSAVES         8   /* STRING in Baum JOURNAL */
 #define MNJPRI           9   /* STRING in Baum JOURNAL */
-#define MNJCLOSE         11  /* STRING in Baum JOURNAL */
+#define MNJLSCRAP        11  /* STRING in Baum JOURNAL */
+#define MNJCLOSE         13  /* STRING in Baum JOURNAL */
 
 #define TTD_KIT          3   /* Formular/Dialog */
 #define TTDK1            0   /* BOX in Baum TTD_KIT */

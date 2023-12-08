@@ -111,7 +111,8 @@ typedef struct bop
 	a fp reg is allways .x the source determines S */
 #if COLDFIRE
 /* 06'11 HR: must split CANM in left and right */
-staticMTBL tblf2[] =
+static
+MTBL tblf2[] =
 {
 	{LISTMP|CANRL|		  CANRM, RETLEFT, 0,0,	"\tNx>S\t<A\t>A" H(tblf2 1) "\n"					},
 	{LISTMP|CANRL,				 RETLEFT, 0,1,	"\tlmx \tR1\t>A\n\tNx>S\t<A\tR1." H(tblf2 1f) "\n"	},
@@ -137,7 +138,8 @@ staticMTBL tblf2[] =
 	{0}
 };
 #else
-staticMTBL tblf2[] =
+static
+MTBL tblf2[] =
 {
 	{LISTMP|CANRL,			RETLEFT, 0,0,	"\tNx>S\t<A\t>A" H(tblf2 1) "\n"				},
 	{RISTMP|CANLR|NDASSOC,	RETRIGHT,0,0,	"\tNx<S\t>A\t<A" H(tblf2 2) "\n"				},
@@ -151,7 +153,8 @@ staticMTBL tblf2[] =
 
 #if COLDFIRE
 /* 06'11 HR: new code table tblasn. */
-staticMTBL tblasn[] =
+static
+MTBL tblasn[] =
 {
 	{LISREG|CANRM|CANAI,	RETLEFT,	0, 0, "\tldx<S\t<A\t>A" H(assign 1) "\n"	},
 	{LISREG,				RETLEFT,	0, 1, "\tlmx  \tR1\t>A\n\tldx<S\t<A\tR1." H(assign 1f) "\n"	},
@@ -163,7 +166,8 @@ staticMTBL tblasn[] =
 	{0}
 };
 
-staticMTBL tbllmul[] =
+static
+MTBL tbllmul[] =
 {
 	{CANRL|LISTMP|CANRM,	RETLEFT, 0,0,	"\tUmpxS\t<A\t>A" H(tbllmul 1) "\n"},
 	{CANRL|LISTMP,			RETLEFT, 0,1,	"\tlmx \tR1\t>A\n\tUmpxS\t<A\tR1." H(tbllmul 1f) "\n"},
@@ -175,7 +179,9 @@ staticMTBL tbllmul[] =
 	{0}
 };
 
-staticMTBL tbllscale[] =
+
+static
+MTBL tbllscale[] =
 {
 	{CANRL|LISTMP|CANRM,	RETLEFT, 0,0,	"\tUmpxS\t<A\t>A" H(tbllscale 1) "\n"},
 	{CANRL|LISTMP,			RETLEFT, 0,1,	"\tlmx \tR1\t>A\n\tUmpxS\t<A\tR1." H(tbllscale 1f) "\n"},
@@ -187,7 +193,8 @@ staticMTBL tbllscale[] =
 	{0}
 };
 
-staticMTBL tblldiv[] =
+static
+MTBL tblldiv[] =
 {
 	{CANRL|LISTMP|CANRM,	RETLEFT,0,0,	"\tUdvxS\t<A\t>A" H(tblldiv 1) "\n"},
 	{CANRL|LISTMP,	        RETLEFT,0,1,	"\tlmx \tR1\t>A\n\tUdvxS\t<A\tR1." H(tblldiv 1f) "\n"},
@@ -197,7 +204,8 @@ staticMTBL tblldiv[] =
 	{0}
 };
 
-staticMTBL tbllmod[] =
+static
+MTBL tbllmod[] =
 {
 	{CANRL|LISTMP|CANRM,	RETLEFT,1,0,	"\tUrmxS\tR1\t>A,<A\n\tldx.l\t<A\tR1" H(tbllmod 1f) "\n"},
 	{CANRL|LISTMP,	        RETLEFT,1,1,	"\tlmx \tR2\t>A\n\tUrmxS\tR1\tR2.,<A\n\tldx.l\t<A\tR1" H(tbllmod 2f) "\n"},
@@ -207,7 +215,8 @@ staticMTBL tbllmod[] =
 	{0}
 };
 
-staticMTBL tblasop[] =
+static
+MTBL tblasop[] =
 {
 	{CANIM|CANM,				RETLEFT,0,0,	"\tNiS\t\t>A,<A" H(tblas 1) "\n"},
 	{CANLD|CANM|LISREGVAR,	RETLEFT,0,0,	"\tNxS\t<A\t>A" H(tblas 2) "\n"},
@@ -222,7 +231,8 @@ staticMTBL tblasop[] =
 };
 
 /* The extra Dregs are allocated before the extra Aregs */
-staticMTBL tblcf[] =
+static
+MTBL tblcf[] =
 {
 	{CANRL|CANRM,	0,0,0,	"\tcpx>S\t<A\t>A" H(tblc 1f) "\n"},
 	{CANRL,	        0,0,1,	"\tlmx  \tR1\t>A\n\tcpx>S\t<A\tR1." H(tblc 2f) "\n"},
@@ -234,7 +244,8 @@ staticMTBL tblcf[] =
 #else
 
 /* 06'11 HR: new code table tblasn. */
-staticMTBL tblasn[] =
+static
+MTBL tblasn[] =
 {
 	{LISREG,		RETLEFT,	0, 0, "\tldx<S\t<A\t>A" H(assign n1) "\n"	},
 	{RISREG,		RETLEFT,	0, 0, "\tsto<S\t>A\t<A" H(assign n2) "\n"	},
@@ -242,7 +253,8 @@ staticMTBL tblasn[] =
 	{0}
 };
 
-staticMTBL tbllmul[] =
+static
+MTBL tbllmul[] =
 {
 	{CANRL|LISTMP,	RETLEFT, 0,0,	"\tUmpxS\t<A\t>A" H(tbllmul 1) "\n"},
 	{CANLR|RISTMP,	RETRIGHT,0,0,	"\tUmpxS\t>A\t<A" H(tbllmul 2) "\n"},
@@ -250,7 +262,8 @@ staticMTBL tbllmul[] =
 	{0}
 };
 
-staticMTBL tbllscale[] =
+static
+MTBL tbllscale[] =
 {
 	{CANRL|LISTMP,	RETLEFT, 0,0,	"\tUmpxS\t<A\t>A" H(tbllscale 1) "\n"},
 	{CANLR|RISTMP,	RETRIGHT,0,0,	"\tUmpxS\t>A\t<A" H(tbllscale 2) "\n"},
@@ -258,21 +271,24 @@ staticMTBL tbllscale[] =
 	{0}
 };
 
-staticMTBL tblldiv[] =
+static
+MTBL tblldiv[] =
 {
 	{CANRL|LISTMP,	RETLEFT,0,0,	"\tUdvxS\t<A\t>A" H(tblldiv 1) "\n"},
 	{CANRD,			RETDREG,0,0,	"\tldxS\tA\t<A\n\tUdvxS\tA\t>A" H(tblldiv 2) "\n"},
 	{0}
 };
 
-staticMTBL tbllmod[] =
+static
+MTBL tbllmod[] =
 {
 	{CANRL|LISTMP,	RETLEFT,1,0,	"\tUrmxS\tR1\t>A,<A\n\tldx.l\t<A\tR1" H(tbllmod 1) "\n"},
 	{CANRD,			RETDREG,1,0,	"\tldxS\tA\t<A\n\tUrmxS\tR1\t>A,A\n\tldx.l\tA\tR1" H(tbllmod 3) "\n"},
 	{0}
 };
 
-staticMTBL tblasop[] =
+static
+MTBL tblasop[] =
 {
 	{CANIM,				RETLEFT,0,0,	"\tNiS\t\t>A,<A" H(tblas 1) "\n"},
 	{CANLD|LISREGVAR,	RETLEFT,0,0,	"\tNxS\t<A\t>A" H(tblas 2) "\n"},
@@ -288,7 +304,8 @@ staticMTBL tblasop[] =
 
 #endif		/* COLDFIRE */
 
-staticMTBL tbl2[] =
+static
+MTBL tbl2[] =
 {
 	{LISTMP|CANRL,			RETLEFT, 0,0,	"\tNxS\t<A\t>A" H(tbl2 1) "\n"},
 	{RISTMP|CANLR|NDASSOC,	RETRIGHT,0,0,	"\tNxS\t>A\t<A" H(tbl2 2) "\n"},
@@ -305,14 +322,16 @@ staticMTBL tbl2[] =
    This table makes combining to extended operand modes
    much more straightforward.
 */
-staticMTBL tblindex[] =
+static
+MTBL tblindex[] =
 {
 	{LISTMP|CANRL,	RETLEFT,0,0,	"\tNx>S\t<A\t>A" H(tbli 1) "\n"},
 	{CANRD,			RETAREG,0,0,	"\tldxS\tA\t<A\n\tNx>S\tA\t>A" H(tbli 2) "\n"},
 	{0}
 };
 
-staticMTBL tblmul[] =
+static
+MTBL tblmul[] =
 {
 	{CANRL|LISTMP,	RETLEFT, 0,0,	"\tUmpxS \t<A\t>A" H(tblmul 1) "\n"},
 	{CANLR|RISTMP,	RETRIGHT,0,0,	"\tUmpxS \t>A\t<A" H(tblmul 2) "\n"},
@@ -320,7 +339,8 @@ staticMTBL tblmul[] =
 	{0}
 };
 
-staticMTBL tblscale[] =
+static
+MTBL tblscale[] =
 {
 	{CANRL|LISTMP,	RETLEFT, 0,0,	"\tUscx \t<A\t>A" H(tblscale 1) "\n"},
 	{CANLR|RISTMP,	RETRIGHT,0,0,	"\tUscx \t>A\t<A" H(tblscale 2) "\n"},
@@ -328,33 +348,38 @@ staticMTBL tblscale[] =
 	{0}
 };
 
-staticMTBL tbldiv[] =
+static
+MTBL tbldiv[] =
 {
 	{CANRL|LISTMP,	RETLEFT,0,0,	"\tmvs.w\t<A\t<A\n\tdvx \t<A\t>A" H(tbldiv 1) "\n"},
 	{CANRD,			RETDREG,0,0,	"\tmvs.w\tA\t<A\n\tdvx \tA\t>A" H(tbldiv 2) "\n"},
 	{0}
 };
 
-staticMTBL tblmod[] =
+static
+MTBL tblmod[] =
 {
 	{CANRL|LISTMP,	RETLEFT,0,0,	"\tmvs.w\t<A\t<A\n\tmdx \t<A\t>A\n\tswx \t<A\t" H(tblmod 1) "\n"},
 	{CANRD,			RETDREG,0,0,	"\tmvs.w\tA\t<A\n\tmdx \tA\t>A\n\tswx \tA" H(tblmod 2) "\n"},
 	{0}
 };
 
-staticMTBL tbludiv[] =
+static
+MTBL tbludiv[] =
 {
 	{CANRD,			RETDREG,0,0,	"\tmvz  \tA\t<A\n\tudvx \tA\t>A" H(tbludiv 2) "\n"},
 	{0}
 };
 
-staticMTBL tblumod[] =
+static
+MTBL tblumod[] =
 {
 	{CANRD,			RETDREG,0,0,	"\tmvz  \tA\t<A\n\tumdx \tA\t>A\n\tswx \tA" H(tblumod 2) "\n"},
 	{0}
 };
 
-staticMTBL tblc[] =
+static
+MTBL tblc[] =
 {
 	{CANIM,	0,0,0,	"\tcpi>S\t\t>A,<A" H(tblc 1) "\n"},
 	{CANRL,	0,0,0,	"\tcpx>S\t<A\t>A" H(tblc 2) "\n"},
@@ -362,7 +387,8 @@ staticMTBL tblc[] =
 	{0}
 };
 /* not yet
-staticMTBL tbleor[] =
+static
+MTBL tbleor[] =
 {
 	{CANIM,	RETLEFT,0,0,	"\teri>S\t\t>A,<A" H(tbleor 1) "\n"},
 	{CANRL,	RETLEFT,0,0,	"\ters>S\t>A\t<A" H(tbleor 2) "\n"},
@@ -371,7 +397,8 @@ staticMTBL tbleor[] =
 };
 */
 
-staticMTBL tblamul[] =
+static
+MTBL tblamul[] =
 {
 	{CANRL,			RETLEFT, 0,0,	"\tUmpx \t<A\t>A" H(tblamul 1) "\n"},
 	{CANLR|RISTMP,	RETRIGHT,0,0,	"\tUmpx \t>A\t<A\n\tsto \t>A\t<A" H(tblamul 2) "\n"},
@@ -379,39 +406,43 @@ staticMTBL tblamul[] =
 	{0}
 };
 
-staticMTBL tbladiv[] =
+static
+MTBL tbladiv[] =
 {
 	{CANRL,	RETLEFT,0,0,	"\tmvs.w\t<A\t<A\n\tdvx \t<A\t>A" H(tbladiv 1) "\n"},
 	{CANRD,	RETDREG,0,0,	"\tmvs.w\tA\t<A\n\tdvx \tA\t>A\n\tsto  \tA\t<A" H(tbladiv 2) "\n"},
 	{0}
 };
 
-staticMTBL tbluadiv[] =
+static
+MTBL tbluadiv[] =
 {
 	{CANRD,	RETDREG,0,0,	"\tmvz \tA\t<A\n\tudvx \tA\t>A\n\tsto \tA\t<A" H(tbluadiv) "\n"},
 	{0}
 };
 
-staticMTBL tblamod[] =
+static
+MTBL tblamod[] =
 {
 	{CANRL,	RETLEFT,0,0,	"\tmvs.w\t<A\t<A\n\tmdx \t<A\t>A\n\tswx \t<A\t" H(tblamod 1) "\n"},
 	{CANRD,	RETDREG,0,0,	"\tmvs.w\tA\t<A\n\tmdx \tA\t>A\n\tswx \tA\n\tsto \tA\t<A" H(tblamod 2) "\n"},
 	{0}
 };
 
-staticMTBL tbluamod[] =
+static
+MTBL tbluamod[] =
 {
 	{CANRD,	RETDREG,0,0,	"\tmvz \tA\t<A\n\tumdx \tA\t>A\n\tswx \tA\n\tsto \tA\t<A" H(tbluamod) "\n"},
 	{0}
 };
 
 
-staticBOPS
+static
+BOPS
 /*	voor interchange code (denkbeeldige (risc?) computer met instr format F X OP)
 	niettemin blijft deze tabel gebaseerd op: LopR, waarbij L is source en R is destination,
 	hoe de uiteindelijke lezing er ook uit mag zien	*/
 
-	 bop_cmpcf=	{"cp", 	EopD|     IopD|EopA|AopA|AopD},
 	 bop_cmp=	{"cp",	EopD|     IopE|EopA|AopA|AopD},
 	 bop_eor=	{"er",	     DopE|IopE},
 	 bop_fcp=	{"cp",	EopD},

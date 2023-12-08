@@ -65,7 +65,7 @@ void	out_fbegin(FP, TP),
 
 VpN		outcode_list;
 
-short	new_lbl(void), new_albl(short);
+short	new_lbl(void);
 
 VpCa	add_out;
 
@@ -78,8 +78,6 @@ VpI		def_lbl,
 		add_br_1_2,
 		add_br_1_3,
 		out_tlbl;
-
-VpII	def_albl;
 
 IpI		loop_lbl;
 
@@ -99,6 +97,7 @@ void	out_b		(short key, short l),
 		send_out	(char *f, ...);
 
 bool	out_setup	(Cstr inname),
+		make_out	(void),
 		o_aln		(short x, short class),
 		can_3q		(long val);
 

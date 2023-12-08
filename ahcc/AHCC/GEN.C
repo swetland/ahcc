@@ -26,10 +26,11 @@
  *	and leafs.
  *
  */
-
+ 
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+
 #include "param.h"
 
 #include "d2.h"
@@ -474,7 +475,7 @@ void take_address(NP np)
 	np->type = nil;			/* code remains in nlp */
 	np->left = nlp;
 	retreg(np, ralloc(AREG, nil));
-	addcode(np, "\tlax  \tA\t<A" C(take_address) "\n");		/* last dynamic addcode() replaced */
+	addcode(np, "\tlax \tA\t<A" C(take_address) "\n");		/* last dynamic addcode() replaced */
 }
 
 global
@@ -559,7 +560,7 @@ bool cast_CC(NP np)
 					addcode(lp, "\tclx \tA\n\tfbN\t\tLf\n\tldx \tA\t#1" C(cast fcc) "\nLf:\n");
 				}
 				else
-					addcode(lp, "\tsN  \tA\n\tanx.l\tA\t#1" C(cast_cc l) "\n");
+					addcode(lp, "\tsN \tA\n\tanx.l\tA\t#1" C(cast_cc l) "\n");
 			}
 			else
 #endif
@@ -567,7 +568,7 @@ bool cast_CC(NP np)
 				if (lp->ty ne ET_CC)
 					addcode(lp, "\tfsN \tA\n");
 				else
-					addcode(lp, "\tsN  \tA\n");
+					addcode(lp, "\tsN \tA\n");
 
 				addcode(lp, "\tanxS\tA\t#1" C(cast_cc) "\n");
 			}
@@ -639,13 +640,23 @@ short cast_gen(NP np)
 
 	if (cast_CC(np))
 	{
+		npsz = np->size;
+		lpsz = lp->size;
 #if FLOAT
 		if (np->ty eq ET_R)			/* 11'15 v5.3 */
 		{
 			retreg(np, ralloc(DREG, np));
 			addcode(np, "\tldx<S\tA\t<A" C(cast_xc) "\n");
 		}
+		else
 #endif
+			if (npsz > lpsz)		/* 01'18 HR: v6 */
+			{
+				if (npsz eq DOT_W and lpsz eq DOT_B)
+					addcode(np, "\twmvz<S\tA\t<A" C(cg_1c) "\n");
+				else
+					addcode(np, "\tmvz<S\tA\t<A" C(cg_1ca) "\n");
+			}
 		return 1;
 	}
 
@@ -743,7 +754,7 @@ short cast_gen(NP np)
 				if (lp->token eq ONAME or lp->token eq OLNAME)
 				{
 					tempr(np, AREG);
-					addcode(np, "\tlmx  \tR1\t<A\n\tldx<S\tA\tR1." C(cg_7f) "\n");
+					addcode(np, "\tlmx \tR1\t<A\n\tldx<S\tA\tR1." C(cg_7f) "\n");
 				}
 				else
 #endif
@@ -765,7 +776,7 @@ short cast_gen(NP np)
 					if ((G.Coldfire and lp->token eq ONAME) or lp->token eq OLNAME)
 					{
 						tempr(np, AREG);
-						addcode(np, "\tlmx  \tR2\t<A\n\tldx<S\tR1\tR2.\n\tintrz.d\tR1\tR1" C(cg_11f) "\n");
+						addcode(np, "\tlmx \tR2\t<A\n\tldx<S\tR1\tR2.\n\tintrz.d\tR1\tR1" C(cg_11f) "\n");
 					}
 					else
 #endif
@@ -840,7 +851,7 @@ short cast_gen(NP np)
 				if ((G.Coldfire and lp->token eq ONAME) or lp->token eq OLNAME)
 				{
 					tempr(np, AREG);
-					addcode(np, "\tlmx  \tR1\t<A\n\tldx<S\tA\tR1." C(cg_10f) "\n");
+					addcode(np, "\tlmx \tR1\t<A\n\tldx<S\tA\tR1." C(cg_10f) "\n");
 				}
 				else
 #endif
@@ -932,7 +943,7 @@ global
 void sys_call(NP np)		/* __syscall__  operator */
 {
 	NP lp = np->left;
-	bool push = lp->cflgs.f.cdec;
+	bool push = lp->xflgs.f.cdec;
 
 	if ((short)lp->lbl >= 0)	/* fld.offset = trap #, lbl = opcode */
 	{
@@ -998,7 +1009,7 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 			if (G.Coldfire and lp->token eq ONAME)
 			{
 				tempr(np, AREG);
-				addcode(np, "\tlmx  \tR1\t<A\n\t");		/* 06'11 HR: lax --> lmx */
+				addcode(np, "\tlmx \tR1\t<A\n\t");		/* 06'11 HR: lax --> lmx */
 				addcode(np, fmop);
 				addcode(np, "<S\tA\tR1." C(u_sube rmonop 1f) "\n");
 			}
@@ -1017,7 +1028,7 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 
 	switch (np->token)
 	{
-	case SELECT:
+	case SELECTOR:
 		if (np->fld.width)
 		{
 			lp->val.i += np->val.i;	/* major HACK, hope it works */
@@ -1054,7 +1065,7 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 		{
 			linherit(np);
 			np->eflgs.f.imm = 0;
-			if (np->token eq ICON)		/* 04'09:  *(char *)0xffff5201 = ... */
+			if (np->token eq ICON)	/* 04'09:  *(char *)0xffff5201 = ... */
 				np->token = O_ABS;
 		}
 		elif (isareg(lp))
@@ -1062,7 +1073,7 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 			np->token = OREG;		/* indir */
 			np->val.i = 0;
 			np->rno = lp->rno;
-		othw							/* NEED A temp */
+		othw						/* NEED A temp */
 			np->token = OREG;		/* indir */
 			np->val.i = 0;
 			if (lp->token eq OREG and is_temp(lp->rno))
@@ -1074,7 +1085,12 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 		}
 		return true;
 	case TAKE:
-		if (is_immed(lp))
+		if (    is_immed(lp)
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+		    and !is_cp(lp)
+#endif
+		   )
 			warnn(lp, "'%s' ignored", graphic[ADDRESS]);
 		elif (lp->token eq REGVAR)
 			errorn(lp, "ref regvar");
@@ -1156,22 +1172,22 @@ bool u_sube(NP np, short context, RMASK r_inhib)
 
 #if FOR_A
 		if (np->left->token eq STMT)
-			addcode(np, "\tbra  \t\t<L1\n<L2:\t\t" C(u_sube primary stmt) "\n");
+			addcode(np, "\tbra \t\t<L1\n<L2:\t\t" C(u_sube primary stmt) "\n");
 		elif (np->left->aflgs.f.lproc)
-			addcode(np, "\tjsl  \t\t<A" C(u_sube local call) "\n");
+			addcode(np, "\tjsl \t\t<A" C(u_sube local call) "\n");
 		else
 #endif
-		if (lp->cflgs.f.sysc)		/* 01'12 HR */
+		if (lp->xflgs.f.sysc)		/* 01'12 HR */
 			sys_call(np);
 		else
 		{
-			if (np->left->cflgs.f.inl_v)	/* 12'13 v5 Pure C type inline */
+			if (np->left->xflgs.f.inl_v)	/* 12'13 v5 Pure C type inline */
 			{
 				to_inl_v(np);
 				addcode(np, "\tinlv \t\t<A" C(u_sube inl_v) "\n");
 			}
 			else
-				addcode(np, "\tjsr  \t\t<A" C(u_sube call) "\n");
+				addcode(np, "\tjsr \t\t<A" C(u_sube call) "\n");
 		}
 		return true;
 	case INCR:
@@ -1425,7 +1441,6 @@ bool u_eval(NP np, short context, RMASK r_inhib)
 #endif
 	if (eval(np->left, subcontext, r_inhib) eq false)
 		return false;
-
 	return u_sube(np, context, r_inhib);
 }
 
@@ -1435,7 +1450,7 @@ bool eval(NP np, short context, RMASK r_inhib)
 	bool rv = false;
 	np->r1 = np->r2 = -1;
 
-	if (np ne nil)
+	if (np)
 		if (np->tt eq EV_NONE)
 			rv = l_eval(np, context, r_inhib);
 		elif (np->tt eq EV_LEFT)
@@ -1451,6 +1466,7 @@ bool eval(NP np, short context, RMASK r_inhib)
 			free1(np, np->left);
 			free1(np, np->right);
 		}
+
 	return rv;
 }
 

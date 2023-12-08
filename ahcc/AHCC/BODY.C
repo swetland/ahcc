@@ -27,17 +27,12 @@
  *
  */
 
-#define noDEBUGZ 1
-
-#define notTIME_PREPRO 1
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include "common/mallocs.h"
 #include "common/amem.h"
-#include "common/hierarch.h"
 #include "common/pdb.h"
 
 #include "param.h"
@@ -78,7 +73,7 @@ short flno;
 
 #if FLOW_SHOW
 static
-void disp_flow_unit(VP np, char *which, short d)
+void disp_flow_unit(VP np, short d)
 {
 	short di = d;
 
@@ -137,32 +132,31 @@ void disp_flow_unit(VP np, char *which, short d)
 	console("\n");
 }
 
+
 /* This function not only gives a fine listing of the function's flow,
 	it is also an excercise in traversing the graph in a correct way;
 	that is: if the graph is well formed. */
 static
-void list_flow(VP np, char *which, short d)
+void list_flow(VP np, short d)
 {
 	if (np)
 		if (np->token eq K_CASE)		/* cases are linked by inner */
 		{
 			while (np)
 			{
-				disp_flow_unit(np, which, d);
-				list_flow(np->next, "N ", d+1);
+				disp_flow_unit(np, d);
+				list_flow(np->next, d+1);
 
-				which = "i ";
 				np = np->inner;
 			}
 		}
 		else
 			while (np)
 			{
-				disp_flow_unit(np, which, d);
-				list_flow(np->inner,"I ",d+1);
-				list_flow(np->F.out,"O ",d+1);
+				disp_flow_unit(np, d);
+				list_flow(np->inner,d+1);
+				list_flow(np->F.out,d+1);
 
-				which = "n ";
 				np = np->next;
 			}
 }
@@ -424,8 +418,6 @@ void label(NP np)
 {
 	VP tp;
 
-	D_(S,"LABEL");
-
 	if (np->token ne ID)
 	{
 		errorn(np, "weird label");
@@ -463,12 +455,8 @@ NP need_expr(void)
 	NP np;
 
 	np = get_expr();
-	if (np)
-	{
-		D_(S,"NXPR");
-	othw
+	if (np eq nil)
 		error("need expression");
-	}
 
 	return np;
 }
@@ -487,7 +475,7 @@ short find_do_lbl(short tok, const char **n)
 		{
 			if (    sc->token eq K_DO
 			    and sc->do_lbl
-			    and strcmp(sc->do_lbl, name) eq 0
+			    and SCMP(300,sc->do_lbl, name) eq 0
 			   )
 			{
 				*n = name;
@@ -515,8 +503,6 @@ bool bra_stmt(VP flow)
 	if (tok eq K_BREAK)
 	{
 		VP root = flow->FF.root;	/* flown */
-
-		D_(S,"BRK");
 
 #if FOR_A
 		if (G.lang eq 'a')
@@ -547,7 +533,6 @@ bool bra_stmt(VP flow)
 #if FOR_A
 	elif (tok eq K_ESAC and G.lang ne 'a')
 	{
-		D_(S,"ESAC");
 		flow->F.escape |= BRK;
 		out_br(flow->FF.brk);
 		return true;			/* 04'13 HR: do not eat ENDS */
@@ -555,8 +540,6 @@ bool bra_stmt(VP flow)
 #endif
 	elif (tok eq K_CONT)
 	{
-		D_(S,"CONT");
-
 #if FOR_A
 		if (G.lang eq 'a')
 			do_lbl = find_do_lbl(tok, &name);
@@ -572,8 +555,6 @@ bool bra_stmt(VP flow)
 	elif (tok eq K_RETURN)
 	{
 		TP tp = G.prtab->type;
-
-		D_(S,"RETURN");
 
 		np=get_expr();
 		new_gp(np,RETURN);
@@ -594,7 +575,7 @@ bool bra_stmt(VP flow)
 				ret_expr(np, tp);
 
 			gp->lbl = G.prtab->fretl;
-			addcode(gp, "\tbra  \t\tL1\n");
+			addcode(gp, "\tbra \t\tL1\n");
 		}
 		out_gp();
 	}
@@ -604,8 +585,6 @@ bool bra_stmt(VP flow)
 	elif (tok eq K_GOTO)
 #endif
 	{
-		D_(S,"GOTO");
-
 		flow->F.escape |= WILD;
 		np = npcur(); advnode();
 		if (np->token ne ID)
@@ -689,13 +668,9 @@ void end_scope(void)
 		check_scope(bp->b_syms);
 #endif
 
-	D_(Z,"freeing b_syms\n");
 	freeTn(bp->b_syms);
-	D_(Z,"freeing b_ops\n");
 	freeTn(bp->b_ops);
-	D_(Z,"freeing b_casts\n");
 	freeTn(bp->b_casts);
-	D_(Z, "freeing b_tags\n");
 	freeTn(bp->b_tags);
 	CC_xfree(bp);				/* arg  or sub  */
 }
@@ -765,6 +740,50 @@ void new_proc(Cstr name)
 	}
 }
 
+/* 11'19 HR v6 */
+static
+short old_to_new (TP old, TP new)
+{
+	TP tp = old->list;
+	short ps = 0;
+
+	while(tp)
+	{
+		TP ap = tlook(new, tp);
+
+		if (ap)
+		{
+			tp->type = ap->type;
+			to_nct(tp);
+			tp->sc = K_AUTO;
+			ps++;
+			old->tflgs.f.o_s_conv = 1;
+		}
+		tp = tp->next;
+	}
+	old->offset = ps;
+	return ps;
+}
+
+static
+void def_to_int(TP tp, long *size)
+{
+	while (tp)
+	{
+		TP ap;
+		if ((ap = tlook(G.scope->b_syms, tp)) eq nil)
+		{
+			def_arg(&G.scope->b_syms, tp);
+			ap = G.scope->b_syms;
+		}
+#if USAGE
+		tp->tflgs.f.isarg = 1;
+#endif
+		arg_size(size, ap);
+		tp = tp->next;
+	}
+}
+
 static
 void body(TP xp, short context)
 {
@@ -783,8 +802,6 @@ void body(TP xp, short context)
 #endif
 
 	/* function body definition possibly with 'old args' */
-	D_(D, "PROC");
-
 	new_proc("func");
 
 	if (G.v_Cverbosity)
@@ -816,19 +833,19 @@ void body(TP xp, short context)
 #endif
 	G.prtab->maxlocs = 0;
 
-	globl_sym(xp, context);		/* after out ivm ev loc name with 'old args' */
+#if ! SY_LATER
+	globl_sym(xp);		/* after out ivm ev loc name with 'old args' */
+#endif
 
 	change_class(TEXT_class);
-	gp->cflgs.f.asm_f = xp->type->tflgs.f.asm_func;
+	gp->xflgs.f.asm_f = xp->type->tflgs.f.asm_func;
+	c_mods(gp, xp->type);		/* 09'19 HR: v6 correct pascal behaviour */
 	addcode(gp, "^S\t\t^N^X\n");	/* ^X pragmats for optimizer per function */
-
 	next_gp(nil);
 	out_fbegin(G.prtab, xp);
-
 	new_scope(T_PROC, "arg block");		/* not anymore an extra outer block for args */
 	G.scope->b_size = 0;				/*   for consistency */
 	G.scope->b_regs = rmask;
-
 	G.prtab->level = 1;		/* Only for if OLD_ARGS */
 	out_gp();
 
@@ -837,8 +854,6 @@ void body(TP xp, short context)
 	{
 		TP bp;
 		new_gp(nil, PROC);
-
-		xp->sc = PROT_USED;			/* must NOT be defined again later */
 
 		/* generate advice for TOP  etc */
 		G.scope->b_syms = copyTnode(tp->list);
@@ -851,13 +866,14 @@ must here because in declarator() we don't know the declarer which is the return
 		bp = G.scope->b_syms;
 		while(bp)
 		{
-			next_gp(reg_arg(&rmask, &argmask, bp, tp->cflgs.f.cdec));		/* includes lc_reg  */
+			next_gp(reg_arg(&rmask, &argmask, bp, tp->xflgs.f.cdec));		/* includes lc_reg  */
 			bp = bp->next;
 		}
 
 		out_gp();
 	othw
 		/* was args_blk */
+		short ps = 0;
 		TP bp, np = tp->list;
 		long size = 0;
 
@@ -870,28 +886,18 @@ must here because in declarator() we don't know the declarer which is the return
 		bp = G.scope->b_syms;
 		while (bp)
 		{
-			if (tlook(np, bp) eq nil)
+			TP kp = tlook(np, bp);
+			if (kp eq nil)
 				errorn(bp, "not in parameter list");
 			bp = bp->next;
 		}
 
 		/* now make any names not mentioned int */
-		bp = np;
-		while (bp)
-		{
-			TP ap;
-			if ((ap = tlook(G.scope->b_syms, bp)) eq nil)
-			{
-				def_arg(&G.scope->b_syms, bp);
-				ap = G.scope->b_syms;
-			}
-#if USAGE
-			bp->tflgs.f.isarg = 1;
+		/* and 11'19 HR v6: attach types to old args list of ID's. */
+		def_to_int(np, &size);
+#if 1
+		ps = old_to_new(tp, G.scope->b_syms);		/* 11'19 HR v6 */
 #endif
-			arg_size(&size, ap);
-			bp = bp->next;
-		}
-
 		add_argbase(G.scope->b_syms, tp->type, ARG_BASE);
 
 		/* generate offsets and alloc regs */
@@ -899,20 +905,26 @@ must here because in declarator() we don't know the declarer which is the return
 		bp = G.scope->b_syms;
 		while (bp)
 		{
-			next_gp(reg_arg(&rmask, &argmask, bp, tp->cflgs.f.cdec));		/* includes lc_reg  */
+			next_gp(reg_arg(&rmask, &argmask, bp, tp->xflgs.f.cdec));		/* includes lc_reg  */
 			bp = bp->next;
 		}
 
 		out_gp();
-
-		freeTn(tp->list);
-		tp->list = nil;
+		if (!ps)
+		{
+			freeTn(tp->list);
+			tp->list = nil;
+		}
 
 		/* 'old args' do not generate a prototype; only a return type
 		 * because the args order in the loc_decl() part is not defined
 		 * so can be different from the order in the argsblk.
 		 */
 	}
+
+#if SY_LATER
+	globl_sym(xp);		/* 12'18 HR: v6 after args ivm ev loc name with 'old args' */
+#endif
 
 	G.scope->b_regs = rmask;
 
@@ -976,7 +988,7 @@ must here because in declarator() we don't know the declarer which is the return
 /*		if (G.v_Cverbosity > 3) */
 	{
 		console("--- flow_chart ---\n");
-		list_flow(G.flow_chart, "* ", 0);
+		list_flow(G.flow_chart, 0);
 	}
 #endif
 #if OPEN_END
@@ -1018,10 +1030,8 @@ must here because in declarator() we don't know the declarer which is the return
 		G.prtab      = bp->outer;
 		bp->outer    = nil;
 
-		D_(Z, "freeing labels");
 		freeVn(bp->labels);
 		new_areas();
-		D_(Z, "freeing outer");
 		CC_xfree(bp);
 	}
 }
@@ -1031,14 +1041,14 @@ must here because in declarator() we don't know the declarer which is the return
 void adddef(Cstr);
 #endif
 
+VpV popflags;
+
 global
 void do_C(void)			/* Main compiler loop on a file
 							only once called from do_file() in main() */
 {
 	TP head, xp;
 	short sclass;
-
-	D_(D, "program:");
 
 #if FOR_A
 	if (G.lang eq 'a' or (G.xlang eq 'a' or G.xlang eq 'd'))
@@ -1050,9 +1060,9 @@ void do_C(void)			/* Main compiler loop on a file
 		adddef("__S__=1");
 	else
 		adddef("__C__=1");
-
 #endif
-	G.prtab = CC_xcalloc(1, sizeof(FNODE), AH_PRTAB, CC_ranout);
+/*	popflags();
+*/	G.prtab = CC_xcalloc(1, sizeof(FNODE), AH_PRTAB, CC_ranout);
 #if NODESTATS
 	G.ncnt[PRNODE]++;
 #endif
@@ -1082,7 +1092,6 @@ void do_C(void)			/* Main compiler loop on a file
 		/* declty is set by derived_type() */
 		head   = Declarer(false, nil, &sclass, &declty);		/* sclass --> declarer (K&R all editions) */
 
-
 		if (!ok_gsh(sclass, head))
 			if (cur->token ne EOFTOK)
 				sclass = K_STATIC;			/* on sc & declarer */
@@ -1100,7 +1109,7 @@ void do_C(void)			/* Main compiler loop on a file
 			        or xp->sc eq K_TYPE
 				   )
 				{
-					globl_sym(xp, context);
+					globl_sym(xp);
 					if (    xp->token eq ID
 						and (   xp->sc eq K_STATIC
 							 or xp->sc eq K_GLOBAL)
@@ -1113,7 +1122,7 @@ void do_C(void)			/* Main compiler loop on a file
 						gpbase = nil;
 					}
 				othw		/* must be code or a prototype */
-					bool con = is_con(cur->token);			/* 12'13 HR v5 value like Pure C */
+					bool con = is_con(cur->token);			/* 12'13 HR: v5 value like Pure C */
 					isbody = cur->token ne COMMA and cur->token ne ENDS;
 					if (isbody and !con)
 						/* code */
@@ -1123,12 +1132,12 @@ void do_C(void)			/* Main compiler loop on a file
 						if (con)
 						{
 							xp->offset = cur->val.i;
-							xp->cflgs.f.inl_v = 1;
+							xp->xflgs.f.inl_v = 1;
 							fadvnode();
 						}
 
 						xp->sc = PROT;  /* prototype */
-						globl_sym(xp, 0);
+						globl_sym(xp);
 					}
 				}
 			othw
@@ -1138,8 +1147,11 @@ void do_C(void)			/* Main compiler loop on a file
 				if (!declty)
 					if ((cur->token ne ENDS and cur->token ne COMMA) or cur->token eq EOFTOK)
 						syntax_error("declarator");
-					else
+					elif (!head->tflgs.f.dflt)
+					{
+						head->fl.ln = line_no;	/* 07'19 HR: quick fix. */
 						errorn(head, "no declarator for");
+					}
 			}
 			iscomma = cur->token eq COMMA;
 			if (iscomma)
@@ -1163,8 +1175,6 @@ void do_C(void)			/* Main compiler loop on a file
 static
 bool sub_block(VP flow)
 {
-	D_(S,"BLOCK");
-
 	eat(BLOCK);
 	if (is_ty_start())
 	{
@@ -1178,7 +1188,6 @@ bool sub_block(VP flow)
 	}
 	eat(KCOLB);
 
-	D_(S,"KCOLB");
 	return true;
 }
 
@@ -1186,8 +1195,6 @@ bool sub_block(VP flow)
 static
 bool block(VP flow)
 {
-	D_(S,"BLOCK");
-
 	eat(BLOCK);
 	phrase(flow, BLOCK);
 	eat(KCOLB);
@@ -1229,8 +1236,6 @@ void add_case(VP swit, ulong val, short lbl)		/* 03'09 long val (was short) */
 		else
 			swit->F.caselist = np;
 		np->next = bp;
-
-		D_(S,"CASELIST");
 	}
 }
 
@@ -1240,8 +1245,6 @@ void new_default(VP flow, short dlbl, short tok, short toek)
 {
 	VP new,
 	   swit = flow->FF.root;
-
-	D_(S,"DEFAULT");
 
 	if (swit eq nil)
 		error("%s outside %s", graphic[toek], graphic[tok]);	/* 3'91 v1.2 */
@@ -1266,8 +1269,6 @@ VP new_case(VP flow, short dlbl)
 	VP np,
 	   new = nil,
 	   swit = flow->FF.root;
-
-	D_(S,"CASE");
 
 	if (swit eq nil)
 		error("%s outside %s", graphic[K_CASE], graphic[K_SWITCH]);	/* 3'91 v1.2 */
@@ -1344,8 +1345,6 @@ bool blk_stmt(VP back)
 	{
 		VP flow;
 
-		D_(S,"IF");
-
 		l1 = new_lbl();
 		flow = new_unit(back, cur, K_IF);
 		eat(PAREN);
@@ -1364,14 +1363,13 @@ bool blk_stmt(VP back)
 			if (cur->token eq K_ELIF)
 			{
 					/* trickbox (see 'if_stmt()' for proper programming (for a proper programming language) ) */
-				D_(S, "ELIF\t");
 				cur->token = K_IF;
 				cur->cat0|=BL_ST;
 					/* This in fact mimics '#define elif else if' */
-			othw
-				D_(S, "ELSE\t");
-				fadvnode();
 			}
+			else
+				fadvnode();
+
 			l2 = new_lbl();
 			flow->F.out = new_out(flow, "false");
 			out_br(l2);
@@ -1384,7 +1382,6 @@ bool blk_stmt(VP back)
 #else
 		if (cur->token eq K_ELSE)
 		{
-			D_(S, "ELSE");
 			fadvnode();
 			l2 = new_lbl();
 			flow->F.out = new_out(flow, "false");
@@ -1401,8 +1398,6 @@ bool blk_stmt(VP back)
 	elif (tok eq K_WHILE)
 	{
 		VP flow;
-
-		D_(S,"WHILE");
 
 		l1=new_lbl();
 		l2=new_lbl();
@@ -1428,8 +1423,6 @@ bool blk_stmt(VP back)
 	elif (tok eq K_DO)
 	{
 		VP flow;
-
-		D_(S,"DO");
 
 		l1=new_lbl();
 		l2=new_lbl();
@@ -1480,7 +1473,6 @@ bool blk_stmt(VP back)
 		VP flow;
 		long e3_line, e2_line;
 
-		D_(S,"FOR");
 		l1=new_lbl();
 		l2=new_lbl();
 		l3=new_lbl();
@@ -1491,7 +1483,6 @@ bool blk_stmt(VP back)
 		eat(PAREN);
 		e1=get_expr();
 		new_gp(e1, EX1);
-		D_(S, "E1_STMT");
 		do_expr(e1, FORSIDE);
 		out_gp();
 		eat(ENDS);
@@ -1516,7 +1507,6 @@ bool blk_stmt(VP back)
 		def_lbl(l2);
 		e2_line = line_no;
 		line_no = e3_line;
-		D_(S, "E3_STMT");
 		new_gp(e3, EX3);
 		do_expr(e3, FORSIDE);
 		out_gp();
@@ -1529,8 +1519,6 @@ bool blk_stmt(VP back)
 		VP flow;
 		short sty;
 		long ssz;
-
-		D_(S,"SWITCH");
 
 		l1=new_lbl();		/* break lable */
 		l2=new_lbl();		/* branch over case code to switching code */
@@ -1607,7 +1595,6 @@ bool C_stmt(VP flow)
 			if (cur->token ne LABEL)
 			{
 				new_gp(np, EXPR);
-				D_(S, "E_STMT");
 				do_expr(np, FORSIDE);
 				eat(ENDS);
 				out_gp();		/* will free everything */

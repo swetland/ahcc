@@ -24,7 +24,7 @@
 
 enum imm_kind {IMMXPR, IMMCONS};
 
-short 	opnd_err	(short n, short which, Cstr msg);
+short 	opnd_err	(short n, Cstr msg);
 void	ea_error	(short n, short type);
 void	cpuerr		(void);
 OPND *	new_arg		(void);

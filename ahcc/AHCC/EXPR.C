@@ -37,7 +37,7 @@
  *				IMPCNV:  implicit
  *				EXPCNV:  explicit (cast)
  *				ARGCNV:  implicit for pushing
- *		TSIZEOF	: type: type-list
+ *		TSIZE	: type: type-list
  *		TOFFSET : type: lookup member in typelist for offset
  *
  */
@@ -120,6 +120,7 @@ void take_flgs(NP np, TP tp)
 {
 	np->eflgs.i = tp->tflgs.i;
 	np->cflgs.i = tp->cflgs.i;
+	np->xflgs.i = tp->xflgs.i;	/* 09'19 HR: v6 needs more flags :-/ */
 }
 
 global
@@ -161,13 +162,11 @@ NP opt_follow(NP np)
 
 #if BIP_ASM
 	if (    G.lang eq 's'
-	    and cur->token ne SELECT
-	    and cur->token ne ASM_SELECT
+	    and cur->token ne SELECTOR
+	    and cur->token ne ASM_SELECTOR
 	   )
 		return np;
 #endif
-
-	D_(X, "opt_follow");
 
 #if FOR_A
 	if (G.lang eq 'a')
@@ -199,7 +198,6 @@ NP opt_follow(NP np)
 		t2->tt = E_BIN;
 		t2->token =  INDEX;		/* this is the action; ARRAY is the type. */
 		name_to_str(t2, "add_index");
-
 		tp->left = t2;
 		tp->tt = E_UNARY;
 		tp->token = DEREF;
@@ -217,10 +215,10 @@ NP opt_follow(NP np)
 		eat(NERAP);
 		break;
 #if BIP_ASM
-	case ASM_SELECT:
+	case ASM_SELECTOR:
 #endif
-	case SELECT:
-	case ARROW:
+	case SELECTOR:
+	case VIA:
 		tp = npcur(); advnode();
 		if (cur->token ne ID)
 		{
@@ -231,9 +229,9 @@ NP opt_follow(NP np)
 		tp->right = npcur(); advnode();
 		tp->tt = E_SPEC;
 
-		if (tp->token eq ARROW)
+		if (tp->token eq VIA)
 		{ 								/* make into (*X).Y */
-			tp->token = SELECT;
+			tp->token = SELECTOR;
 			name_to_str(tp, "member");
 
 			t2 = make_node(DEREF, E_UNARY, 0, "deref");
@@ -334,8 +332,6 @@ NP primary(void)
 #endif
 	short tok = cur->token;
 
-	D_(X, "primary");
-
 #if BIP_ASM
 	if (    G.lang eq 's' 		/* 05'11 HR repair equ */
 	    and tok eq ID
@@ -364,7 +360,7 @@ NP primary(void)
 	}
 
 #if BIP_ASM
-	if (G.lang eq 's' and tok eq SELECT)		/* unary use of dot in assembler names */
+	if (G.lang eq 's' and tok eq SELECTOR)		/* unary use of dot in assembler names */
 	{
 		fadvnode();
 		if (cur->token eq ID)
@@ -483,14 +479,47 @@ NP make_cast(char *nm)
 	return np;
 }
 
+#if BOFFS
+static
+void do_O(NP np)
+{
+	NP lp;
+
+	if (np)
+	{
+		if (np->token ne EXPCNV)
+		{
+			do_O(np->left);
+			do_O(np->right);
+		othw
+			TP tp = np->type;
+			lp = np->left;
+			if (lp)
+			{
+				if (lp->token eq K_O)
+				{
+					*np = *lp;
+					freeunit(lp);
+					np->left = nil;
+					np->type = tp;
+					to_nct(np);
+					np->token = ID;
+#if BOFFS
+					to_of(np);
+#endif
+				}
+			}
+		}
+	}
+}
+#endif
+
 static
 NP unary(void)
 {
 	NP tp, e1;
 
 	short op = cur->token;
-
-	D_(X, "unary");
 
 	if (   is_unop(cur->token)
 		or cur->cflgs.f.rlop)
@@ -588,8 +617,8 @@ NP unary(void)
 		if (e1->token eq EXPCNV)		/* if made cast */
 		{
 			freeunit(tp);
-			e1->token = TSIZEOF;
-			name_to_str(e1, "T_sizeof");
+			e1->token = TSIZE;
+			name_to_str(e1, "T_size");
 			e1->tt = E_LEAF;
 			return e1;
 		othw
@@ -598,47 +627,30 @@ NP unary(void)
 		}
 	}
 
-	elif (op eq K_OFFSET)
+#if BOFFS
+	elif (op eq K_OFFS)	/* 08'19 HR for experimentation */
 	{
 		tp = npcur(); advnode();
-		e1 = make_cast("offsetof");		/* must be type expr */
+		/* 09.19 HR: We want to get the correct (manageable)
+		      expression tree. */
+#if 0
+		tp = unary();
+		do_O(tp);
+#else
+ 		e1 = unary();
+		do_O(e1);
 
-		if (e1 eq nil or (e1 and e1->token ne EXPCNV))
-		{
-			errorn(cur, "'%s' %s at", graphic[K_OFFSET], exprs);
-			freeunit(tp);
-			return nil;
-		}
-
-		freeunit(tp);
-		if (!is_aggreg(e1->type))
-		{
-			errorn(cur, "'%s' needs aggreg at", graphic[K_OFFSET]);
-			return nil;
-		}
-		e1->token = TOFFSET;
-		name_to_str(e1, "T_offset");
-		tp = e1;
+/* This token represents the starting point of the handling
+   of the offsetof expression tree. (basically a specific context).
+*/
+		tp->token = TOFFS;
 		tp->tt = E_UNARY;
-		if (cur->token ne SELECT)
-		{
-			errorn(cur, "'%s' needs selection at", graphic[K_OFFSET]);
-			freenode(e1);
-			return nil;
-		}
-		fadvnode();
-		if (cur->token ne ID)
-		{
-			errorn(cur, "'%s' needs ID at", graphic[K_OFFSET]);
-			freenode(e1);
-			return nil;
-		}
-		tp->left = npcur(); advnode();
-		tp->left->token = MEMBER;
-		tp->left->type = basic_type(SIZE_T, 20);
-		to_nct(tp->left);
-		return tp;
+		tp->left = e1;
+#endif
+/*	print_node(tp, "K_OFFS",1,0,1);
+ */		return tp;
 	}
+#endif
 	elif (op eq K_VARGL)
 	/* '...' in expressions is address of position of '...' in the parameter list */
 	/* we turn '...' into '& __ELLIPSIS__'		*/
@@ -669,8 +681,6 @@ static
 NP binary(void)
 {
 	NP lp, op, up;
-
-	D_(X, "binary");
 
 	lp = unary();
 	if (lp)
@@ -725,8 +735,6 @@ NP questx()
 	NP holdq, holdc,
 	   qpart, tpart, fpart;
 
-	D_(X, "questx");
-
 	qpart = binary();
 	if (qpart eq nil)
 		return nil;
@@ -763,8 +771,6 @@ NP assignx(void)
 {
 	NP op, lpart, rpart;
 
-	D_(X, "assignx");
-
 	lpart = questx();
 	if (lpart eq nil)
 		return nil;
@@ -788,8 +794,6 @@ NP get_expr(void)
 {
 	NP op, lpart, rpart;
 
-	D_(X, "get_expr");
-
 	if ( (lpart = assignx()) ne nil /* and !G.lang eq 'a' */)
 	{
 		while (cur->token eq COMMA)
@@ -807,6 +811,7 @@ NP get_expr(void)
 			lpart = op;
 		}
 	}
+
 	return lpart;
 }
 
@@ -828,8 +833,6 @@ NP get_arglist(void)
 {
 	NP rv, comma, lpart, rpart;
 	long i = 0;
-
-	D_(X, "get_arglist");
 
 	if ( (lpart = assignx()) eq nil)		/* 0 args */
 		return nil;

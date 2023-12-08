@@ -33,17 +33,12 @@
 	#define FILES 1
 #endif
 
-#if defined FMENU
-	#define CAN_CLICK 1
-	#define FSVIEW 1
+#if FU_TREE
 	#define TREEWIN 1
-	#define WMENU 1
+	#define CAN_CLICK 1
 #endif
 
-#if defined DMENU
-	#define CAN_CLICK 1
-	#define DPVIEW 1
-	#define TREEWIN 1
+#if defined  FMENU || defined DMENU
 	#define WMENU 1
 #endif
 
@@ -62,7 +57,7 @@
 #endif
 
 #if defined BMENU	/* binary file editor */
-	#define BINARY 1
+	#define BINED 1
 	#define CAN_CLICK 1
 	#define BSELECTION 1
 	#define FILES 1
@@ -75,8 +70,6 @@
 	#define FILES 1
 	#define WMENU 1
 #endif
-
-#define TREVIEW 1
 
 #if defined MNWKS	/* worksheets */
 	#define WKS 1

@@ -12,7 +12,7 @@ shell\ahcl.ttp
 .C [-W-par -W-stv -W-sig -W-cln]	; warning level must be 2 !!
 .L [-S=8192]
 =
-pcvstart.o
+ahcstart.o
 
 ahcc\cc_load.c
 ahcc\ld.c		(ahcc\po.h)
@@ -25,7 +25,5 @@ ahcc\ttp_io.c
 
 common\aaaa_lib.c
 common\hierarch.c	; hierarchic name manipulation
-common\ahcm.c		; non fragmenting and thread save memory allocator
 
-pcstdlib.lib
-pctoslib.lib
+ahccstd.lib

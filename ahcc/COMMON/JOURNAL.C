@@ -45,6 +45,9 @@
 #ifdef MNJDEP
 #include "pdb.h"
 #endif
+#ifdef MNJLSCRAP
+#include "scrap.h"
+#endif
 #include "wdial.h"
 #include "ahcm.h"
 
@@ -80,7 +83,7 @@ TIMER timer_timer
 		v=txt;
 		t=ttijd();
 		while (*t ne 0) *v++=*t++;
-		if ( strcmp(txt,otxt) ne 0 )
+		if ( SCMP(40,txt,otxt) ne 0 )
 		{
 			strcpy(otxt,txt);
 			strcpy(w->info, txt);
@@ -201,10 +204,10 @@ WINIT jrnl_winit
 	{
 		if (!cw)
 			cw=36;								/* usefull defaults */
-		w->in.w = cw*deskw.unit.w + w->v.w+w->mgw.w;
+		w->in.w = cw*deskw.unit.w + w->v.w;
 		if (!ch)
 			ch=11;								/* quarter ST high screen */
-		w->in.h = ch*deskw.unit.h + w->v.h+w->mgw.h;
+		w->in.h = ch*deskw.unit.h + w->v.h;
 
 		w->in.x = (wwa.w-w->in.w)/2;
 		if (w->in.x < 0)				/* for low res */
@@ -328,6 +331,11 @@ void do_jFile(IT *w,short mt)	/* w = my top window */
 		cfg.volat=!cfg.volat;
 		w->con.volat = cfg.volat;
 		options(ttdcfg, OSET);
+	break;
+	#endif
+	#ifdef MNJLSCRAP
+	case MNJLSCRAP:
+		load_scrap(w);
 	break;
 	#endif
 #ifdef MINICONS
@@ -534,11 +542,12 @@ BUTTON con_click		/* w,button,kstate,bclicks,mx,my */
 
 static
 bool con_cursor(IT *w, short kcode)
+/* returns true if a code is processed. */
 {
 	short k=kcode&0xff;
 
 	if (kcode&NKF_CTRL)
-		return true;
+		return true;		/* Any CTRL combination is discarded. */
 	if (kcode&NKF_SHIFT)
 	{
 		if (k eq NK_LEFT)
@@ -604,7 +613,7 @@ void con_key(IT *w, short kcode)
 		{
 			*(w->line+w->con.prompt)=0;
 			s->xrm=w->view.sz.w-w->con.prompt;
-			s->xl=w->con.prompt;
+			s->x_l=w->con.prompt;
 			w->cu.pos.x=w->con.prompt;
 			x_to_s_t(w,&w->cu);
 			if (!make_vis_top(w))
@@ -618,7 +627,7 @@ void con_key(IT *w, short kcode)
 			d=s->xtx+w->cu.pos.x;
 			c=d+1;
 			while ( (*d++ = *c++) ne 0);	/* incl NL */
-			s->xl-=1;
+			s->x_l-=1;
 			s->xrm+=1;
 			if (!make_vis_top(w))
 				(*w->disp)(w,s,HIDE);
@@ -628,14 +637,14 @@ void con_key(IT *w, short kcode)
 	}
 	elif (s->xrm > 1 and k)
 	{
-		short j=s->xl-w->cu.pos.x+1;
-		char *c=s->xtx+s->xl;
+		short j=s->x_l-w->cu.pos.x+1;
+		char *c=s->xtx+s->x_l;
 		char *d=c+1;
 		while(j--)
 			*d--=*c--;
 		*(s->xtx+w->cu.pos.x)=k;
 		s->xrm-=1;
-		s->xl+=1;
+		s->x_l+=1;
 
 		x_to_s_t(w,&w->cu);
 		if (!make_vis_top(w))
@@ -696,6 +705,30 @@ KEYBD con_keybd    /* IT *w,short kcode */
 		cur_on(w);
 	}
 }
+
+/* 12'17 [GS] & HR
+ * scrap routines provided by Gerhard Stoll (GS)
+ */
+
+#ifdef MNJLSCRAP
+void load_scrap(IT *w)
+{
+	/* Only effective when con_input is active!!! */
+	char buf[80];
+	long len, i;
+	if (scrap_rtxt( buf, &len, 30) ne nil)
+	{
+		if (*buf eq 0)
+			send_msg("empty clipboard\n");
+		else
+			loop(i, len)
+				if (isprint(buf[i]))
+					con_key(w,buf[i]);
+	}
+	else
+		send_msg("Couldnt access clipboard\n");
+}
+#endif
 #endif		/* MINICONS */
 
 #ifdef GEMSHELL
@@ -715,7 +748,7 @@ Wstr Found, Scanning;
 static
 char *get_fname(char *f, char *p)
 {
-	while(*f and *f ne ' ')
+	while(*f and *f ne ' 'and *f ne '\'')
 		*p++=*f++;
 	*p=0;
 	return f;
@@ -912,8 +945,7 @@ void init_jrnl(COPRMSG *init_text, DIALFI find, short full)
 		otxt[i]=' ';
 	otxt[i]=0;	/* tbv tijd */
 
-	if	( (w=create_IT(
-					false,		/* no WIND_CREATE */
+	if	( (w=create_IT(false,		/* no WIND_CREATE */
 					Journal,
 					0,
 					ttijd(),
@@ -999,9 +1031,10 @@ void init_jrnl(COPRMSG *init_text, DIALFI find, short full)
 					m_kader,
 					0,
 					nil,
-
 					deskw.unit,
+					0,		/* 07'20 HR v6 */
 					deskw.points,
+					MINMARGIN,
 					txt_margin
                    )
 				)
@@ -1042,6 +1075,7 @@ void init_jrnl(COPRMSG *init_text, DIALFI find, short full)
 
 extern
 char msg_buf[];
+
 extern
 short  msg_l;
 
@@ -1095,7 +1129,7 @@ STMC *ins_msg(IT *w, short *jbl, char *jb, MSGMODE top)
 				{
 					st->xtx=mal;
 					strmaxcpy(mal,sn,l);
-					st->xl=l;
+					st->x_l=l;
 					st->xfg=ISMOD;
 					st->xty=0;
 					st->xrm=0;
@@ -1211,18 +1245,51 @@ STMC *ins_msg(IT *w, short *jbl, char *jb, MSGMODE top)
 
 global
 char msg_tab[] = "\t";
+extern FILE *bugf;
+extern short depth;
+
+static
+char *indent(void)
+{
+	static char tabs[128];
+	short lvl = depth;
+	char *t = tabs;
+
+	*t = 0;
+
+	while (lvl--) *t++ = '\t';
+
+	*t = 0;
+	return tabs;
+}
+
+/* Called by built_in compiler. */
+/* 11'19 HR v6: function indent */
+global
+void console(Cstr text, ...)
+{
+	va_list argpoint;
+	va_start(argpoint,text);
+
+	if (bugf ne stdout or !journal_created)
+	{
+		fprintf(bugf, "%s\t", indent());
+		vfprintf(bugf, text, argpoint);
+	}
+	else
+	{
+		msg_l+=sprintf(msg_buf+msg_l, "%s", indent());
+		msg_l+=vsprintf(msg_buf+msg_l,text,argpoint);
+		ins_msg(get_it(-1,JRNL),&msg_l,msg_buf,TOP);
+	}
+	va_end(argpoint);
+}
 
 /* Called by shell & built_in compilers main */
-/* if compiler is .TTP this fu is different from 'console'
-	and both are in TTP_IO.C */
+
 global
 void send_msg(char *text, ...)
 {
-#ifdef GEMSHELL
-extern
-FILE *bugf;
-#endif
-
 	va_list argpoint;
 	va_start(argpoint,text);
 
@@ -1250,15 +1317,19 @@ FILE *bugf;
 		   )
 		{
 			short lvl = va_arg(argpoint, short);
-			while (lvl--)
+
+			while (lvl-- > 0)		/* 10'19 HR: v6 lvl could be < 0 */
 				msg_l+=sprintf(msg_buf+msg_l, msg_tab);
+
 			text += 3;		/* this keeps it compatible
 			                   if you use the format string in a other
 			                   environment simply nnnn> is printed */
 		}
+
 		msg_l+=vsprintf(msg_buf+msg_l,text,argpoint);
 		ins_msg(get_it(-1,JRNL),&msg_l,msg_buf,TOP);
 	}
+
 	va_end(argpoint);
 }
 
@@ -1347,7 +1418,7 @@ void con_input(IT *on,short task,short stage,
 	wi_title(w);
 
 	st = find_line(w, w->view.sz.h - 1);
-	st->xl = ml;
+	st->x_l = ml;
 	ret = w->line + ml;
 	*ret=0;
 	st->xrm=MAXJ-ml;
@@ -1369,22 +1440,3 @@ void con_input(IT *on,short task,short stage,
 	}
 }
 #endif
-
-/* Called by built_in compilers main */
-
-global
-void console(char *text, ...)
-{
-	extern FILE *bugf;
-	va_list argpoint;
-	va_start(argpoint,text);
-
-	if (bugf ne stdout or !journal_created)
-		vfprintf(bugf,text,argpoint);
-	else
-	{
-		msg_l+=vsprintf(msg_buf+msg_l,text,argpoint);
-		ins_msg(get_it(-1,JRNL),&msg_l,msg_buf,TOP);
-	}
-	va_end(argpoint);
-}

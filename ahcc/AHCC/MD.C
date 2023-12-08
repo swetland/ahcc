@@ -43,7 +43,7 @@
 #define debug_x (G.yflags['x' - 'a'])
 
 #define ERRCONST warn
-#define isfield(np) ((np)->token eq SELECT and (np)->fld.width)
+#define isfield(np) ((np)->token eq SELECTOR and (np)->fld.width)
 
 global
 void strsncpy(char *d, Cstr s, size_t l);
@@ -493,14 +493,18 @@ bool mustlval(NP np)
 	{
 	case ID:
 	case DEREF:
-	case SELECT:
+	case SELECTOR:
 		break;
 	case EXPCNV:			/* allow casting */
 	case IMPCNV:
 	case ARGCNV:
 		return mustlval(np->left);
 	default:
+#if C_DEBUG
+		errorn(np, "not lvalue: %s", ptok(np->token) );
+#else
 		errorn(np, "not lvalue");
+#endif
 		return true;
 	}
 	return false;
@@ -529,28 +533,29 @@ bool is_CC(void *vp)
 }
 
 static
-void not_allowed(NP np)
+void not_allowed(NP np, short w)
 {
-	errorn(np, "<%s> not allowed", graphic[np->type->token]);
+	errorn(np, "<%s> not allowed (%d)", graphic[np->type->token], w);
 }
 
 global
-bool mustty(NP np, short flags)		/* returns true if failure */
+bool mustty(NP np, short flags, short w)		/* returns true if failure */
 {
 	short tok = np->type->token;
+
 	switch (tok)
 	{
 	case REFTO:
 		if (flags & R_POINTER)
 			return false;
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 	case K_STRUCT:
 	case K_UNION:
 	case ROW:				/* init local array */
 		if (flags & R_STRUCT)
 			return false;
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 #if FOR_A				/* arithmitic by external functions (ahcc_rt.h) */
 	case T_STRING:		/* 10'14 v5.2 */
@@ -576,21 +581,21 @@ bool mustty(NP np, short flags)		/* returns true if failure */
 #endif
 		if (flags & R_BIN)
 			return false;
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 #if FLOAT
 	case T_FLOAT:
 	case T_REAL:
 		if (flags & R_FLOATING)
 			return false;
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 #endif
 	case T_VOID:
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 	case T_VARGL:
-		not_allowed(np);
+		not_allowed(np, w);
 		return true;
 	case T_BOOL:
 #if FOR_A
@@ -598,7 +603,7 @@ bool mustty(NP np, short flags)		/* returns true if failure */
 		{
 			if (flags & R_CC)				/* true boolean */
 				return false;
-			not_allowed(np);
+			not_allowed(np, wm);
 			return true;
 		}
 #endif
@@ -620,7 +625,7 @@ bool mustty(NP np, short flags)		/* returns true if failure */
 global
 bool must2ty(NP np, short flags)
 {
-	return mustty(np->left,flags) or mustty(np->right, flags);
+	return mustty(np->left,flags,-2) or mustty(np->right, flags, -1);
 }
 
 static
@@ -678,10 +683,14 @@ short narrow(TP tp, short to)
 #if FOR_A
 		case T_DEF:
 #endif
-		case T_SHORT:		tok = to eq DOT_B ? T_CHAR : T_INT; break;
+		case T_SHORT:
+			tok = to eq DOT_B ? T_CHAR : T_INT;
+		break;
 		case T_ULONG:
 		case T_UINT:
-		case T_USHORT:		tok = to eq DOT_B ? T_UCHAR : T_UINT; break;
+		case T_USHORT:
+			tok = to eq DOT_B ? T_UCHAR : T_UINT;
+		break;
 	}
 
 	return tok;
@@ -734,7 +743,7 @@ TP functy(TP np)
 	short lt = np->type->token;
 
 	if (lt ne T_VOID)
-		mustty((NP)np, R_ASSN);
+		mustty((NP)np, R_ASSN,23);
 	switch (lt)
 	{
 	case REFTO:
@@ -939,7 +948,7 @@ void asn_check(TP ltp, NP rp, short context)
 			return;
 		if (rtp->token eq REFTO and rtp->type->token eq T_VOID)
 			return;
-		if (mustty(rp, R_POINTER))
+		if (mustty(rp, R_POINTER,24))
 			return;
 		if (rtp->token eq REFTO)
 			reason = similar_type(0,1,ltp->type, rtp->type, 0, sim_context);		/* 11'13 HR v5 */
@@ -961,7 +970,7 @@ void asn_check(TP ltp, NP rp, short context)
 		}
 		return;
 	default:
-		if (mustty(rp, R_BIN|R_ARITH))
+		if (mustty(rp, R_BIN|R_ARITH,25))
 			return;
 	}
 }
@@ -1245,11 +1254,11 @@ TP scalety(NP np)
 			if (np->token eq DIV)	/* not changed to shift */
 			{
 #if COLDFIRE
-				if (G.Coldfire and !external_binary_op(np))
+				if (G.Coldfire and !b_overload(np))
 					cold_con(np, np->type);		/* 01'12 HR: Omission. See also after ins_mul */
 #else
-				external_binary_op(np);	/* extracodes: now we know left & right types for
-						               external defined binary operators (e.g. ldiv) */
+				b_overload(np);	/* extracodes: now we know left & right types for
+						           external defined binary operators (e.g. ldiv) */
 #endif
 			}
 		}
@@ -1261,7 +1270,7 @@ TP scalety(NP np)
 	{
 		if (is_ass_op(oop) or op eq MINUS)
 		{
-			errorn(rp, "illegal int %s pointer", graphic[oop&(TOKMASK)]);
+			errorn(rp, "Illegal int %s pointer", graphic[oop&(TOKMASK)]);
 			return default_type(-1, 0);
 		}
 		np->left = rp;
@@ -1284,7 +1293,7 @@ TP scalety(NP np)
 
 	tp = lp->type;						/* type of pointer */
 										/* ptr +-[ integral */
-	mustty(rp, R_INTEGRAL);
+	mustty(rp, R_INTEGRAL,26);
 
 	/* ins_mul includes typing of rp !!! */
 	if (ins_mul(np, tp->type->size))		/* ptr +-[ (index*objectsize) */
@@ -1311,11 +1320,11 @@ TP scalety(NP np)
 		    othw
 		    	castdefault(rp->left,rp->right,rtp);
 #if COLDFIRE
-				if (G.Coldfire and !external_binary_op(rp))		/* 01'12 HR: only for Coldfire target */
+				if (G.Coldfire and !b_overload(rp))		/* 01'12 HR: only for Coldfire target */
 					cold_con(rp, rtp);
 #else
-				external_binary_op(rp);	/* extracodes: now we know left & right types for
-								           external defined binary operators (e.g. lmul) */
+				b_overload(rp);	/* extracodes: now we know left & right types for
+								   external defined binary operators (e.g. lmul) */
 #endif
 			}
 		othw			/* LSHIFT */
@@ -1818,7 +1827,7 @@ bool cast_con(NP cp, TP ntp, Cstr cn, short context)
 			{
 				char t[32];
 				sprintf(t,"%s", ptok(ntp->token));
-				message(0,0,"Cast_con[%s] %s to %s", cn, ptok(ctp->token), t);
+				message("Cast_con[%s] %s to %s", cn, ptok(ctp->token), t);
 			}
 #endif
 			cast_tab[cpn][npn](cp, ctp, ntp);
@@ -1877,7 +1886,7 @@ void Cast(NP np, TP tp, short cnv, Cstr cn)
 	np->type = tp;
 	to_nct(np);
 	np->cflgs.f.rlop = 0;
-	external_cast(np);			/* s/w dbl */
+	c_overload(np);		/* s/w dbl */
 }
 
 global
@@ -2000,7 +2009,7 @@ void cast_compare(NP np, NP lp, NP rp)
 	/* Never cast a var to the width of a constant */
 	if (rp->token eq ICON and lp->token ne ICON)
 #if FLOAT
-	    if (ltp->ty eq ET_R)		/* 10'10 HR: cast ICON to RCON */
+		if (ltp->ty eq ET_R)		/* 10'10 HR: cast ICON to RCON */
 	    	Cast(rp, ltp, IMPCNV, "CastIR");
 		else
 #endif
@@ -2033,14 +2042,12 @@ void castasop(NP lp, NP rp)
 
 /* cast for: +=  -=  >>=  <<=  &=  ^=  |= */
 global
-
 void castasmagic(NP lp, NP rp)
 {
 	TP ltp = lp->type, rtp = rp->type;
 
 	if (    stronger(ltp, rtp)		/* left stronger */
 		or xstronger(rtp, ltp) )	/* right stronger with ET_S and ET_U considered equal */
-
 		Cast(rp, ltp, IMPCNV, "CastX=");
 }
 
@@ -2291,7 +2298,7 @@ NP arg_regs(NP np)
 	{
 		if (
 				np->right
-		    and np->left->type->cflgs.f.cdec eq 0
+		    and np->left->type->xflgs.f.cdec eq 0
 		   )
 		{
 			short an = AREG,
@@ -2399,7 +2406,7 @@ NP arg_regs(NP np)
 }
 
 global
-bool external_cast(NP np)
+bool c_overload(NP np)
 {
 	TP rv = nil;
 	SCP loc;
@@ -2429,7 +2436,7 @@ bool external_cast(NP np)
 }
 
 global
-bool external_unary_op(NP np)
+bool u_overload(NP np)
 {
 	TP rv = nil;
 	SCP loc;
@@ -2453,18 +2460,20 @@ bool external_unary_op(NP np)
 		np->right = arg;
 		lp->eflgs.f.typed = 1;
 		arg_regs(np);
-
 		return true;
 	}
 	return false;
 }
 
 global
-bool external_binary_op(NP np)
+bool b_overload(NP np)
 {
 	TP rv = nil;
 	SCP loc;
 	short tok = np->token;
+
+	if (tok eq COMMA)
+		return false;			/* 02'18 HR. comma's should not be overloaded */
 
 	if (tok eq SCALE)
 		np->token = TIMES;						/* 11'09 HR: Ooooofffff Pffff! */
@@ -2485,7 +2494,7 @@ bool external_binary_op(NP np)
 		comma = make_node(ARG, E_BIN, 2, "exbpars");
 		np->right = comma;
 
-		arg = make_node(ARG, E_UNARY, 1, nil);
+		arg = make_node(ARG, 0, 1, nil);
 		arg->left = rp;
 		arg->type = lp->type;
 		to_nct(arg);
@@ -2711,7 +2720,7 @@ bool isvhard(NP np)
 static
 bool m_vhard(NP lp)
 {
-	while (lp->token eq SELECT)
+	while (lp->token eq SELECTOR)
 		lp = lp->left;
 	if (lp->token ne DEREF)
 		return false;
@@ -2739,7 +2748,6 @@ void comma_l(NP topp, NP rp)
 	topp->left = newp;
 }
 
-
 static
 NP etmp_var(short token)
 {
@@ -2764,7 +2772,7 @@ TP hardassign(NP np, TP tp)
 		/* put result of whole left expression in a temp */
 		NP atree, t1, t2, opp, starp = np->left;
 
-		while (starp->token eq SELECT)
+		while (starp->token eq SELECTOR)
 			starp = starp->left;
 		atree = starp->left;
 
@@ -2800,7 +2808,7 @@ TP hardassign(NP np, TP tp)
 		oldnp->token = ASS;
 		name_to_str(oldnp, "unfold");
 		opp->token -= (ASSIGN 0);
-		name_to_str(opp, graphic[opp->token]);		/* for external_binary_op() */
+		name_to_str(opp, graphic[opp->token]);		/* for b_overload() */
 		binary_types(opp, FORSIDE, 0);
 		oldnp->type = oldnp->left->type;		/* left type for assignment */
 		to_nct(oldnp);

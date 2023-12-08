@@ -52,6 +52,7 @@ void init_cc(void)
 
 	adddef("__MC68000__=1");
 	adddef("__TURBOC__=1");
+	adddef("TURBO_C=1");		/* 06'19 HR: very old Pure C projects */
 	adddef("__PUREC__=1");
 	adddef("__bool_true_false_are_defined=1");		/* C99 */
 

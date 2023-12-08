@@ -59,7 +59,7 @@ void nl(IT *w, short which)
 	short tx, ty, lw = pos-regel, hl;
 	DW *dw = w->dw;
 
-	hl = w->hl;
+	hl = w->vhl;
 
 	if (z fil)
 		*pos = 0, fprintf(ofile, "%s\n", regel);
@@ -85,7 +85,7 @@ void nl(IT *w, short which)
 			lw = 0;
 		ty = w->ma.y+(w->unit.h*z lnr);
 		tx = w->ma.x;
-		f_txt(hl, tx, ty, regel+w->norm.pos.x);
+		v_gtext(hl, tx, ty, regel+w->norm.pos.x);
 		if (lw < w->norm.sz.w)
 			pbox(hl, tx+(w->unit.w*lw), ty, tx+(w->norm.sz.w*w->unit.w)-1, ty+w->unit.h-1);
 
@@ -432,8 +432,8 @@ bool standard(IT *w)
 
 			if (disok ne 0)
 			{
-				vst_color(w->hl, 2);
-				vst_effects(w->hl, bold);
+				vst_color(w->vhl, 2);
+				vst_effects(w->vhl, bold);
 				if (disok > 0)
 				{
 					z openline = false;
@@ -792,7 +792,7 @@ void labels_multiple(IT *w, PC a, long pp, bool sep, short which)
 				}
 			}
 		}
-		
+
 }
 
 static
@@ -988,8 +988,8 @@ bool with_labels(IT *w)
 				short col = z prcol ? z prcol : 2;	/* v8.2 */
 				if (mop15 and !disok)
 					col = 4;						/* v8.3 */
-				vst_color(w->hl, col); 
-				vst_effects(w->hl, bold);
+				vst_color(w->vhl, col);
+				vst_effects(w->vhl, bold);
 			}
 
 			if (disok ne 0)
@@ -1272,9 +1272,9 @@ void assembler(IT *w)
 			(BTST(sp,23) and (sp&0xff000000) eq 0) ? 16
 			                                       : w->cg.rdx,
 			z lbl_len);
-		vst_effects(w->hl, SHADED);
-		f_txt(w->hl, w->ma.x, w->ma.y, regel);
-		vst_effects(w->hl, 0);
+		vst_effects(w->vhl, SHADED);
+		v_gtext(w->vhl, w->ma.x, w->ma.y, regel);
+		vst_effects(w->vhl, 0);
 		pos = regel;
 		*pos = 0;
 	}
@@ -1341,14 +1341,14 @@ DRAW draw_page			/* draw only !! no interpretations of defs */
 	short dum;
 
 	hidem;
-	vst_height(w->hl, w->points, &dum, &dum, &dum, &dum);
+	vst_height(w->vhl, w->points, &dum, &dum, &dum, &dum);
 
 	w->view.sz.w = 0;
 	z lnr = 0;
-	pbox(w->hl, w->wa.x,
-				w->wa.y,
-				w->wa.x+(w->mgw.x mod w->unit.w)-1,
-				w->wa.y+w->wa.h-1);
+	pbox(w->vhl, w->wa.x,
+				 w->wa.y,
+				 w->wa.x+(w->mg.w mod w->unit.w)-1,
+				 w->wa.y+w->wa.h-1);
 	z kp = z keep;
 
 	if (w->cg.asc)
@@ -1360,7 +1360,7 @@ DRAW draw_page			/* draw only !! no interpretations of defs */
 	keep_label(dw, z pc.b, 0);
 
 	if (ii>0)
-		pbox(v_hl,				/* spacefill rest of window */
+		pbox(w->vhl,				/* spacefill rest of window */
 				w->ma.x,
 				w->ma.y+(w->norm.sz.h-ii)*w->unit.h,
 				w->ma.x+w->ma.w-1,

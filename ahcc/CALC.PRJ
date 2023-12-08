@@ -8,7 +8,9 @@ calc\calc.prg
 .C [-DRSRC_H="calc\calc.h"]
 .C [-DRSRC_RSC="calc.rsc"]
 .C [-DPRGNAME="CALC"]
-.C [-DSHEET=1]
+.C [-DDBG=0]
+.C [-DOB_HIGH=1]
+.C [-DSHEET=1]				; used by F_x
 
 .C [-2 -8]
 

@@ -28,12 +28,13 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <ahcm.h>
 #include "mallocs.h"
-#include "ahcm.h"
 
 #define BIGS 128
 
-static char matches(char c, char *f)	/* verb */
+static
+char matches(char c, char *f)	/* verb */
 {
 	while (*f)		/* must have pairs */
 	{
@@ -117,7 +118,6 @@ char * alert_secure(short max, char *s)		/* copying: */
 	return o;
 }
 
-global
 short alert_text(char *f, ... )		/* sort of original alert_text */
 {
 	char m[BIGS], *mp=m;
@@ -267,14 +267,14 @@ global
 void mv_scrrat(RECT *ps,PRB *p)		/* check against screen without sticking */
 {
 
-	if (   ps->x+p->dx       < scr_grect.x
-		or ps->x+ps->w+p->dx > scr_grect.x+scr_grect.w )
+	if (   ps->x+p->dx       < screct.x
+		or ps->x+ps->w+p->dx > screct.x+screct.w )
 		p->o.x=ps->x;					/* do not stick on bound */
 	else
 		ps->x+=p->dx;
 
-	if (   ps->y+p->dy       < scr_grect.y
-		or ps->y+ps->h+p->dy > scr_grect.y+scr_grect.h )
+	if (   ps->y+p->dy       < screct.y
+		or ps->y+ps->h+p->dy > screct.y+screct.h )
 		p->o.y=ps->y;
 	else
 		ps->y+=p->dy;
@@ -303,14 +303,13 @@ void mv_snaprat(short ol,bool snap,bool stick,RECT *ps,PRB *p,RECT o)
 	}
 }
 
-void form_set(RECT *dp,RECT *sc,OBJECT *db,short startob,MFDB *dump);
-
 global
 short aform_move(OBJECT *db,short hl,void *area,bool snap,
 					  short edob,short *cured,short moveob, short undoob,
 					  GRECT *vrijheid)
 {
 	short obno=0;
+	void form_set(RECT *dp,RECT *sc,OBJECT *db,short startob,MFDB *dump);
 
 	MFDB schrm=MFDBnull;
 	MFDB dump =MFDBnull;
@@ -344,7 +343,7 @@ short aform_move(OBJECT *db,short hl,void *area,bool snap,
 		hidem;
 		copy_gform(form_hndl,pxy,&schrm,&dump);
 		showm;
-		draw_ob(db,0,ps,1);
+		draw_ob(db,0,ps);
 	}
 	return obno;
 }
@@ -358,10 +357,9 @@ short form_move(OBJECT *db, short hl, void *area, bool snap,
 }
 
 global
-void draw_ob(OBJECT *ob,short item,RECT cl,short which)
+void draw_ob(OBJECT *ob,short item,RECT cl)
 {
 	objc_draw(ob,item,MAX_DEPTH,cl.x,cl.y,cl.w,cl.h);
-/*	v_show_c(phys_handle,1);	*/	/* force (needed on some OS's HR: hmmm, AHCC now uses correct handle */
 }
 
 static
@@ -399,8 +397,6 @@ void form_set(RECT *dp,RECT *sc,OBJECT *db,short startob,MFDB *dump)
 static
 char *sch_alert="[1][Not enough memory|for screen dump area. !][ Quit! ]";
 
-#define TRACE(a) alert_text("-= " #a " =-");
-
 global
 void *form_save(OBJECT *db,short startob,short hl)			/* return dumparea */
 {
@@ -424,7 +420,7 @@ void *form_save(OBJECT *db,short startob,short hl)			/* return dumparea */
 	form_hndl=hl;
 	copy_gform(hl,pxy,&schrm,&dump);
 	showm;
-	draw_ob(db,startob,pxy.pv,2);
+	draw_ob(db,startob,pxy.pv);
 	return dump.fd_addr;
 }
 
@@ -583,7 +579,7 @@ short aform_cursor(OBJECT *db, short edob, short xob, short *idx)
 global
 short aform_do(OBJECT *db,short start, short *cured, short movob,short undoob)
 {
-	short edob,nob,xob,mob,which,cont=1;
+	short edob,nob,xob,mob,who,cont=1;
 	short idx,mx,my,mb,ks,kr,br;
 
 	if (start eq 0)
@@ -599,11 +595,11 @@ short aform_do(OBJECT *db,short start, short *cured, short movob,short undoob)
 
 	while (cont)
 	{
-		which=evnt_multi(
+		who=evnt_multi(
 			MU_KEYBD|MU_BUTTON, 2,1,1, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,
 			&mx,&my,&mb, &ks,&kr,&br);
 
-		if (which & MU_KEYBD)
+		if (who & MU_KEYBD)
 		{
 			if (kr eq 0x6100 and undoob)		/* UNDO */
 			{
@@ -624,7 +620,7 @@ short aform_do(OBJECT *db,short start, short *cured, short movob,short undoob)
 			}
 		}
 
-		if (which & MU_BUTTON)
+		if (who & MU_BUTTON)
 		{
 			nob=objc_find(db,0,MAX_DEPTH,mx,my);
 			/* ALTERNATE-left-button or right-button same as double click */
@@ -681,33 +677,44 @@ bool cont_move(short m)
 }
 
 global
+void knaag(short *x, short *y, short *k)
+{
+	short dum;
+	graf_mkstate(x, y, k, &dum);
+}
+
+global
 void movebox(short hl,RECT *d,PRB *p,short init,void (*rat)(void) )
 {
 	bool c=true;
-	short x,y,ox,oy,k,s;
+	short x,y,ox,oy,k;
 
 	vsl_udsty(hl,0x5555);
 	vsl_type(hl,7);
 	vsl_color(hl,1);
 	vswr_mode(hl,3);
-	if (init) gsbox(hl,*d);        /* teken */
+	if (init)
+		gsbox(hl,*d);        /* teken */
 	if ( move_mode eq CLICK)
 		while ( mousek() );   /* loslaten */
-	mouse(x,y,k,s);
+	muis(x,y,k,s);
 	ox=x;
 	oy=y;
 	p->o=*d;
 	p->r=*d;					/* reference box */
+
 	graf_mouse(USER_DEF,&flathand);
-	while (c)
+
+	do
 	{
-		mouse(x,y,k,s);
+		muis(x,y,k,s);
 		p->dx=x-ox;
 		p->dy=y-oy;
 
 		(*rat)();		/* bepaalt nieuwe box in d met p.dx en p.dy */
 
-		c=cont_move(s);
+		c=cont_move(k);
+
 		if ( (d->x ne p->o.x or d->y ne p->o.y) and c)
 		{
 			gsbox(hl,p->o);		/* ontteken		*/
@@ -717,9 +724,11 @@ void movebox(short hl,RECT *d,PRB *p,short init,void (*rat)(void) )
 		ox=x;
 		oy=y;
 	}
+	while (c);
+
 	gsbox(hl,*d);        /* ontteken */
 	if (move_mode eq CLICK)
-		if (s eq 1) p->sn=1; else p->sn=0; else p->sn=1;		/* no cancel option by button if HOLD */
+		if (k eq 1) p->sn=1; else p->sn=0; else p->sn=1;		/* no cancel option by button if HOLD */
 	vswr_mode(hl,1);
 	vsl_type(hl,1);
 	if (move_mode eq CLICK) while ( mousek());   /* loslaten */
@@ -798,15 +807,19 @@ void gsdline(short hl, RECT r)
 }
 
 global
-void pbox(short h,short xl,short yl,short xr,short yr)
+void pbox(short hdl,
+	short xleft,
+	short yleft,
+	short xright,
+	short yright)
 {
 	short xy[4];
 
-	xy[0]=xl;
-	xy[1]=yl;
-	xy[2]=xr;
-	xy[3]=yr;
-	v_bar(h,xy);
+	xy[0]=xleft;
+	xy[1]=yleft;
+	xy[2]=xright;
+	xy[3]=yright;
+	v_bar(hdl,xy);
 }
 
 global
@@ -930,7 +943,7 @@ bool match_pattern(Cstr t, Cstr pat)
 static
 short bracer = 0, lvl = 0;
 
-static
+global
 bool opposite(uchar c, bool o)
 {
 	uchar op = 0;
@@ -943,6 +956,7 @@ bool opposite(uchar c, bool o)
 			case '<': op = '>'; break;
 			case '(': op = ')'; break;
 			case '{': op = '}'; break;
+			case '[': op = ']'; break;
 		}
 	else				/* closing bracer */
 		switch (c)
@@ -950,6 +964,7 @@ bool opposite(uchar c, bool o)
 			case '>': op = '<'; break;
 			case ')': op = '('; break;
 			case '}': op = '{'; break;
+			case ']': op = '['; break;
 		}
 
 	if (op)
@@ -1231,7 +1246,7 @@ short exotic(short hl,RECT *wwa)
 
 /* l is supposed to be the exact maximum no of digits that can be held */
 global
-char *cbd(short n,short l,short z)
+char * cbd(short n,short l,short z)
 {
 	short sign=n;
 	static char x[32]; char *a; short i;
@@ -1244,7 +1259,7 @@ char *cbd(short n,short l,short z)
 }
 
 global
-char *cbdl(long n,short l,short z)
+char * cbdl(long n,short l,short z)
 {
 	long sign=n;
 	static char x[32]; char *a; short i;
@@ -1257,7 +1272,7 @@ char *cbdl(long n,short l,short z)
 }
 
 global
-char *cbdu(unsigned short n,short l,short z)
+char * cbdu(unsigned short n,short l,short z)
 {
 	static char x[32]; char *a; short i;
 	CBD
@@ -1265,7 +1280,7 @@ char *cbdu(unsigned short n,short l,short z)
 }
 
 global
-char *cbdlu(unsigned long n,short l,short z)
+char * cbdlu(unsigned long n,short l,short z)
 {
 	static char x[32]; char *a; short i;
 	CBD
@@ -1273,7 +1288,7 @@ char *cbdlu(unsigned long n,short l,short z)
 }
 
 global
-char *cbx(unsigned long n,short l,short z)
+char * cbx(unsigned long n,short l,short z)
 {
 	static char x[32];
 	char *a;
@@ -1293,7 +1308,7 @@ char *cbx(unsigned long n,short l,short z)
 }
 
 global
-char *cbr(unsigned long n,short l,short z,short r)
+char * cbr(unsigned long n,short l,short z,short r)
 {
 	static char x[32];
 	char *a;
@@ -1354,11 +1369,6 @@ long crbv(Cstr s,short r)
 			n=b*n+(c-r);
 	return n;
 }
-
-typedef struct
-{
-	long id,val;
-} COOKIE;
 
 static
 long stackcorr,			/* make _longframe globally available */
@@ -1492,16 +1502,6 @@ bool get_cookie(long cookie, long *value)
 }
 
 global
-bool is_outside(RECT o,RECT i)
-{
-	return (   o.x     < i.x
-			or o.y     < i.y
-			or o.x+o.w > i.x+i.w
-			or o.y+o.h > i.y+i.h
-		   );
-}
-
-global
 bool intersects(RECT i, RECT o)
 {
    short xl, yu, xr, yd;      /* left, upper, right, down */
@@ -1522,12 +1522,22 @@ bool intersects(RECT i, RECT o)
 }
 
 global
-bool is_inside(RECT i,RECT o)	/* i completely inside o */
+bool is_inside(RECT i, RECT o)	/* i completely inside o */
 {
 	return (    i.x     >= o.x
 			and i.y     >= o.y
 			and i.x+i.w <= o.x+o.w
 			and i.y+i.h <= o.y+o.h
+		   );
+}
+
+global
+bool is_outside(RECT o, RECT i)	/* i at least partly outside o */
+{
+	return (   o.x     < i.x
+			or o.y     < i.y
+			or o.x+o.w > i.x+i.w
+			or o.y+o.h > i.y+i.h
 		   );
 }
 
@@ -1592,7 +1602,7 @@ long Fdump(char *fn, short *rfl, long l, void *map)
  */
 
 global
-char *Fload(Cstr name, short *fh, long *l, short which)
+char *Fload(Cstr name, short *fh, long *l, short who)
 {
 	long pl = 0, fl;
 	char *bitmap = nil;
@@ -1608,7 +1618,7 @@ char *Fload(Cstr name, short *fh, long *l, short which)
 		fl &= 0xffff;
 		pl = Fseek(0L, fl, 2);
 		Fseek(0L, fl, 0);
-		bitmap = fcalloc(1, pl+4, which);	/* 03'09 seems to need a little margin for Qpfind c.s. */
+		bitmap = fcalloc(1, pl+4, who);	/* 03'09 seems to need a little margin for Qpfind c.s. */
 		if (bitmap)
 		{
 			Fread(fl, pl, bitmap);
@@ -1812,17 +1822,6 @@ long compress(uchar *f,uchar *s,long l, bool sta)
 	return (f-of);
 }
 
-/* ivm deze undefs helemaal achteraan houden */
-#undef min
-global
-short min( short a, short b)
-{	return a < b ? a : b; }
-#undef max
-global
-short max( short a, short b)
-{	return a > b ? a : b; }
-
-
 static
 bool no_percent(char *s)
 {
@@ -1836,95 +1835,9 @@ bool no_percent(char *s)
 	return perc;
 }
 
-global
-void saveconfig(FILE *fp, OpEntry *tab, short level)
-{
-	char s[150];
 
-	while(tab->s.str[0])
-	{
-		short lvl = level;
+void console(Cstr, ...);
 
-		if (    tab->s.o.srt eq '{'
-		    and tab->a       ne nil
-		   )
-			(*(CFGNEST *)tab->a)(fp, &tab, level, 1);
-		elif (    tab->s.o.srt  ne '{'
-		      and tab->s.str[0] ne '}'
-		      and tab->max      >= 0
-		      and tab->a        eq nil
-		     )
-			alert_text("CE: | wrong cfg | '%s' | %d,0x%08x", tab->s.str, tab->max, tab->a);
-		elif (tab->max >= 0)
-		{
-			if (tab->s.o.srt eq '{' or tab->s.str[0] eq '}')
-				lvl--;
-			while (lvl-- > 0)
-				fprintf(fp, "\t");
-
-			switch (tab->s.o.srt)
-			{
-				case 's':
-				{
-					char *ss=tab->a;
-					if (*ss eq 0)
-					{
-						tab++;
-						continue;
-					}
-
-					while(*ss)
-					{
-						if (*ss eq ' ')
-							*ss='@';
-						ss++;
-					}
-					sprintf(s, tab->s.str, tab->a);
-				}
-				break;
-	#if CAN_HN
-				case 'h':
-				{
-					HI_NAME *hn = *(HI_NAME **)tab->a;
-					hn_full(hn, s, &hn->vsep, false);
-				}
-				break;
-	#endif
-				case 'd':
-				case 'c':
-				{
-					short *v = tab->a;
-					sprintf(s, tab->s.str, *v);
-				}
-				break;
-				case 'l':
-				{
-					long *v = tab->a;
-					sprintf(s, tab->s.str, *v);
-				}
-				break;
-#if FLOAT
-				case 'g':
-				{
-					double *v = tab->a;
-					sprintf(s, tab->s.str, *v);
-				}
-				break;
-#endif
-				default:
-				{
-					strcpy(s, tab->s.str);
-				}
-			}
-
-			fputs(s, fp);
-		}
-
-		tab++;
-	}
-}
-
-void console(char *, ...);
 #define CFP 1
 global
 short CF(FILE *cf, OpEntry *tab)
@@ -1955,12 +1868,10 @@ short CF(FILE *cf, OpEntry *tab)
 			{
 				if  (!tab->a)										return 200+n;
 			}
-#if CAN_HN
 			elif (tab->s.o.srt eq 'h')
 			{
 				if  (!tab->a)										return 300+n;
 			}
-#endif
 			elif ( tab->s.o.srt eq 'd'
 			{
 				if  (!tab->a)										return 400+n;
@@ -2098,13 +2009,11 @@ bool loadconfig(FILE *fp, OpEntry *cfgtab, short level)
 
 				if (tab->a and tab->max >= 0)
 
-#if 1
 				switch(tab->s.o.srt)
 				{
 				case 's':
 					cfgcpy(tab->a, s, tab->max);
 					break;
-#	if CAN_HN
 				case 'h':
 				{
 					HI_NAME *hn = *(HI_NAME **)tab->a;
@@ -2113,7 +2022,6 @@ bool loadconfig(FILE *fp, OpEntry *cfgtab, short level)
 					*(HI_NAME **)tab->a = hn_make(s, ":\\.", 4);
 				}
 				break;
-#	endif
 				case 0x7b:	/* open brace */
 					(*(CFGNEST *)tab->a)(fp, &tab, level, 0);
 				break;
@@ -2123,11 +2031,11 @@ bool loadconfig(FILE *fp, OpEntry *cfgtab, short level)
 				case 'l':
 					*(long *)tab->a=cldbv(s);
 				break;
-#	if __68881__
+#if __68881__
 				case 'g':
 					*(double *)tab->a=atof(s);
 				break;
-#	endif
+#endif
 				default:
 					if   (strnicmp(s, "true",  4) eq 0 /* or strncmp(s, "TRUE",  4) eq 0 */)
 						*(short *)tab->a=true;
@@ -2136,35 +2044,6 @@ bool loadconfig(FILE *fp, OpEntry *cfgtab, short level)
 					else
 						*(short *)tab->a=cdbv(s);	/* this is the least dangerous; it is very likely to stop soon and it cannot corrupt memory. */
 				}
-#else
-				if ( tab->s.o.srt eq 's' )
-					cfgcpy(tab->a, s, tab->max);
-#	if CAN_HN
-				elif ( tab->s.o.srt eq 'h' )
-				{
-					HI_NAME *hn = *(HI_NAME **)tab->a;
-					if (hn)
-						hn_free(hn);
-					*(HI_NAME **)tab->a = hn_make(s, ":\\.", 4);
-				}
-#	endif
-				elif ( tab->s.o.srt eq 0x7b )	/* open brace */
-					(*(CFGNEST *)tab->a)(fp, &tab, level, 0);
-				elif (tab->s.o.srt eq 'c')
-					*(uint *)tab->a=*s++;
-				elif (tab->s.o.srt eq 'l')
-					*(long *)tab->a=cldbv(s);
-#	if __68881__
-				elif (tab->s.o.srt eq 'g')
-					*(double *)tab->a=atof(s);
-#	endif
-				elif (strncmp(s, "true",  4) eq 0 or strncmp(s, "TRUE",  4) eq 0)
-					*(short *)tab->a=true;
-				elif (strncmp(s, "false", 5) eq 0 or strncmp(s, "FALSE", 5) eq 0)
-					*(short *)tab->a=false;
-				else
-					*(short *)tab->a=cdbv(s);	/* this is the least dangerous; it is very likely to stop soon and it cannot corrupt memory. */
-#endif
 				break;
 			}
 			tab++;
@@ -2182,6 +2061,127 @@ bool loadconfig(FILE *fp, OpEntry *cfgtab, short level)
 		}
 	}
 	return true;
+}
+
+global
+void saveconfig(FILE *fp, OpEntry *tab, short level)
+{
+	char s[150];
+
+	while(tab->s.str[0])
+	{
+		short lvl = level;
+
+		if (    tab->s.o.srt eq '{'
+		    and tab->a       ne nil
+		   )
+			(*(CFGNEST *)tab->a)(fp, &tab, level, 1);
+		elif (    tab->s.o.srt  ne '{'
+		      and tab->s.str[0] ne '}'
+		      and tab->max      >= 0
+		      and tab->a        eq nil
+		     )
+			alert_text("CE: | wrong cfg | '%s' | %d,0x%08x", tab->s.str, tab->max, tab->a);
+		elif (tab->max >= 0)
+		{
+			if (tab->s.o.srt eq '{' or tab->s.str[0] eq '}')
+				lvl--;
+			while (lvl-- > 0)
+				fprintf(fp, "\t");
+
+			switch (tab->s.o.srt)
+			{
+				case 's':
+				{
+					char *ss=tab->a;
+					if (*ss eq 0)
+					{
+						tab++;
+						continue;
+					}
+
+					while(*ss)
+					{
+						if (*ss eq ' ')
+							*ss='@';
+						ss++;
+					}
+					sprintf(s, tab->s.str, tab->a);
+				}
+				break;
+				case 'h':
+				{
+					HI_NAME *hn = *(HI_NAME **)tab->a;
+					hn_full(hn, s, &hn->vsep, false);
+				}
+				break;
+				case 'd':
+				case 'c':
+				{
+					short *v = tab->a;
+					sprintf(s, tab->s.str, *v);
+				}
+				break;
+				case 'l':
+				{
+					long *v = tab->a;
+					sprintf(s, tab->s.str, *v);
+				}
+				break;
+#if __68881__
+				case 'g':
+				{
+					double *v = tab->a;
+					sprintf(s, tab->s.str, *v);
+				}
+				break;
+#endif
+				default:
+				{
+					strcpy(s, tab->s.str);
+				}
+			}
+
+			fputs(s, fp);
+		}
+
+		tab++;
+	}
+}
+
+global
+void changeconfig(OpEntry *tab, void *old, void *new)
+{
+	while(tab->s.str[0])
+	{
+		if (    tab->a
+		    and tab->s.str[0] ne '{'
+		    and tab->s.o.srt  ne '{')
+		{
+			(long)tab->a -= (long)old;
+			(long)tab->a += (long)new;
+		}
+		tab++;
+	}
+}
+
+global
+OpEntry *copyconfig(OpEntry *tab, void *old, void *new)
+{
+	short l = 1;
+	OpEntry *newtab, *this = tab;
+
+	while(this->s.str[0]) l++, this++;		/* count entries */
+
+	l *= sizeof(OpEntry);
+	newtab = malloc(l);
+	if (newtab)
+	{
+		memcpy(newtab, tab, l);
+		changeconfig(newtab, old, new);
+	}
+
+	return newtab;
 }
 
 #define RC_LOW G_BOX
@@ -2306,3 +2306,13 @@ void rc_free(BT **t)
 	xfree(*t);
 	*t = nil;
 }
+
+/* ivm deze undefs helemaal achteraan houden */
+#undef min
+global
+short min( short a, short b)
+{	return a < b ? a : b; }
+#undef max
+global
+short max( short a, short b)
+{	return a > b ? a : b; }

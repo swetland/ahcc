@@ -83,7 +83,7 @@ short phys_handle, virt_handle;		/* workstation handles */
 void Getcolor	(short k,COLOR *kl);
 short Colnum	(short k);
 short  v_color	(short k);
-void TsetPalet	(PALETTE *pal,short all);
+void TsetPalet	(short which,short vhl,PALETTE *pal,short all);
 
 #define ST_low (scr.rez == 0)
 #define ST_medium (scr.rez eq 1)
@@ -170,21 +170,19 @@ extern
 V_WORKOUT scr;
 #endif
 extern
-RECT  scr_grect;
+RECT screct;
 extern
-VRECT scr_vrect;
+VRECT scvrect;
 extern
 bool MagX;
 
-extern
-short v_hl;
-short instt_scr	(void);
-short get_vw(int vl, int wi[], int wo[], int *cw, int *ch);
-
 typedef void VV(void);
 
-VV	old_scr, clr_scr, dump_scr, upsd_scr, switch_scr,
+VV	instt_scr,
+	old_scr, clr_scr, dump_scr, upsd_scr, switch_scr,
 	savedesk, resetdesk,
 	marrow;
+
+short open_vwk(short which, char *s, short *wi, short *wo);
 
 #endif

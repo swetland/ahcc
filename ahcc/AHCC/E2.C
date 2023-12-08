@@ -32,7 +32,6 @@
 #include <ctype.h>
 #include <tos.h>
 #include "common/dict.h"
-#include "common/hierarch.h"
 #include "common/pdb.h"
 
 #include "param.h"
@@ -54,8 +53,31 @@
 #define debugM  G.xflags['m'-'a']
 
 #define ICONRIGHT 1			/* icons to the left give better code (moveq #n,Dn) */
-#define FUNFOLD2 0			/* uncorrect yet */
 #define is_icon(tok)	((tok) eq ICON)
+
+#if OFFS
+/* 07'19 HR: v6 repair Pure C style offsetof */
+static
+void adopt_i(NP np, TP tp)
+{
+	NP lp = np->left;
+	if (lp)
+	{
+
+		c_cp(np, lp);
+		np->val = lp->val;
+		np->type = tp;
+		to_nct(np);
+		np->token = lp->token;
+		np->left = lp->left;
+		np->right = lp->right;
+		np->tt = lp->tt;
+		freeunit(lp);
+	}
+	else
+		CE_N(np, "adopt_i no left");
+}
+#endif
 
 static
 void gen_expr(NP np, short context)
@@ -89,15 +111,13 @@ void impl_deref(NP np, TP tp)
 static
 TP new_func(NP op)
 {
-	short context = 0;
 	TP np;
-	D_(_x, "new_func");
 	/* we know left, right and type are nil */
 	np = e_copyone_t(op);
 	np->type = basic_type(T_PROC, 30);
 	to_nct(np);
 	np->sc = K_EXTERN;
-	globl_sym(np, context);
+	globl_sym(np);
 	np->nflgs.f.nheap = op->nflgs.f.nheap;		/* symtab must own the name */
 	op->nflgs.f.nheap = 0;
 
@@ -108,6 +128,7 @@ static
 void see_func(NP np)	/* restricted version of see_id() */
 {
 	TP tp = all_syms((TP)np, 0);
+
 	if (tp eq nil)
 	{
 #if FOR_A
@@ -127,11 +148,11 @@ void see_func(NP np)	/* restricted version of see_id() */
 	clr_flgs(np);
 	np->cflgs.f.undef   = tp->cflgs.f.undef;
 	np->cflgs.f.see_reg = tp->cflgs.f.see_reg;
-	np->cflgs.f.cdec    = tp->cflgs.f.cdec;
-	np->cflgs.f.inl_v   = tp->cflgs.f.inl_v;	/* 12'13 v5 */
+	np->xflgs.f.inl_v   = tp->xflgs.f.inl_v;	/* 12'13 HR: v5 */
+	c_mods(np, tp);								/* 09'19 HR: v6 correct pascal behaviour */
 	np->type = tp->type;
 	to_nct(np);
-	if (np->cflgs.f.inl_v)
+	if (np->xflgs.f.inl_v)
 		np->val.i = tp->offset;
 }
 
@@ -196,7 +217,6 @@ void callee_type(NP np, short context)
 {
 	NP lp = np->left;
 
-	D_(_x, "callee_type");
 #if FOR_A
 	if (lp->token ne STMT)
 #endif
@@ -297,7 +317,6 @@ void match_args(NP np)	/* and insert argcasts  */
 #if FOR_A
 	bool loc = np->left->type->token eq L_PROC;
 #endif
-	D_(_x, "match_args");
 
 	tl = np->left->type;
 
@@ -305,9 +324,12 @@ void match_args(NP np)	/* and insert argcasts  */
 
 	if (!tl->tflgs.f.ans_args)
 	{
-		warnn(np->left, "No args matching for");
 		promote_args(np->right);
-		return;
+		if (!tl->tflgs.f.o_s_conv)	/*	11'19 HR v6: converted to ansi */
+		{
+			warnn(np->left, "No args matching for");
+			return;
+		}
 	}
 
 	tl = tl->list;					/* list is ID or REFTO */
@@ -375,29 +397,42 @@ void match_args(NP np)	/* and insert argcasts  */
 	}
 }
 
-/* np points to ID or DEREF or SELECT node
+/* np points to ID or DEREF or SELECTOR node
 	type is a COPY
 	type token is ROW  */
 
 static
 void see_array(NP np)
 {
-	NP tp;
+	NP tp, lp;
 
 #if BIP_ASM
 	if (G.lang eq 's')
 		return;
 #endif
+	lp = np->left;
 	tp = copyone(np);
-	tp->left = np->left;
+	tp->left = lp;
 	np->size = tp->type->size;		/* keep total size */
 	tp->type = tp->type->type;		/*	hier verdwijnt Arr of, maar staat nog in np
 									    dus houdt zijn not_a_copy flag ?*/
 	np->left = tp;
+	lp = tp;
 	np->token = TAKE;
 	np->tt = E_UNARY;
 	name_to_str(np, "array_to_pointer");
 	array_to_pointer((TP)np);			/* Array of --> Arref to */
+
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+	if (lp->token eq SELECTOR)
+	{
+		if (lp->left)
+			if (is_cp(lp->left))
+				adopt_i(lp, lp->type);
+	}
+#endif
+
 #if FOR_A
 	if (G.lang eq 'a')
 	{
@@ -418,19 +453,39 @@ void keep_qual(void * vtp, void  *vnp)
 	}
 }
 */
+
+void lookup(void *np, void *nv)
+{
+	AP pt = nv, rp = np;
+	console("\n**** lookup: '%s'\n", rp->name);
+	while (pt)
+	{
+		console("'%s'\n", pt->name);
+		pt = pt->left;
+	}
+	console("\n****\n");
+}
+
 /* (struct|union).ID */
 static
 void member_type(NP xp)
 {
 	NP rp, lp; TP sup, rv;
-
+/* print_node (xp, "member_type",1,1,0);
+*/
 	rp = xp->right;
 	lp = xp->left;
 	sup = lp->type;
-
+#if BOFFS
+	c_of(xp, lp);
+#endif
 /* already checked that rp->token is ID */
-
-	if ( !is_aggreg(sup) )
+/* 07'19 HR: v6 repair Pure C style offsetof: left ne ICON */
+	if (    !is_aggreg(sup)
+#if OFFS
+	    and is_cp(lp)
+#endif
+	   )
 	{
 		errorn(lp, "select non-%s/%s", graphic[K_STRUCT], graphic[K_UNION]);
 		rv = default_type(-1, 0);
@@ -438,9 +493,11 @@ void member_type(NP xp)
 		rv = tlook(sup->list, (TP)rp);
 		if (rv eq nil)
 		{
-			errorn(rp, "not member of '%s'", sup->name);
+/*			lookup(sup->list, rp);
+*/			error("'%s' not member of '%s'", rp->name, sup->name);
 			rv = default_type(-1, 0);
-		othw
+/*			print_node(sup->list, "member_type tlook",1,1,0);
+*/		othw
 			xp->val.i = rv->offset;
 			if (rv->fld.width)
 				xp->fld = rv->fld;
@@ -471,13 +528,15 @@ long confold_value(NP np, short context)
 {
 	long l;
 
-	D_(_x, "confold_value");
-
 	if (np)
 	{
 		form_types(np, context, 0);	/* confold now in form_types */
 
-		if (is_con(np->token))			/* 11'13 HR is_con */
+		if (   is_con(np->token)			/* 11'13 HR is_con */
+#if BOFFS
+		    or is_of(np)					/* 09'19 HR new offsetof */
+#endif
+		   )
 		{
 			l = np->val.i;
 			freenode(np);
@@ -498,8 +557,6 @@ global
 NP asm_expr(void)
 {
 	NP np, ind, e1;
-
-	D_(_x, "asm_expr");
 
 	np = questx();		/* xpr without commas */
 
@@ -550,8 +607,6 @@ NP asm_expr(void)
 static
 void newicon(NP np, long x)
 {
-	D_(_x, "newicon");
-
 	np->token = ICON;
 	np->val.i = x;
 	new_name(np, "%ld", x);
@@ -595,14 +650,12 @@ void makefcon(NP np, double x, short r_or_f)
 global
 void newfcon(NP np, float x)
 {
-	D_(_x, "newfcon");
 	makefcon(np, x, FCON);
 }
 
 global
 void newrcon(NP np, double x)
 {
-	D_(_x, "newrcon");
 	makefcon(np, x, RCON);
 }
 
@@ -611,15 +664,12 @@ void newrcon(NP np, double x)
 static
 void insptrto(NP np)
 {
-	D_(_x, "insptrto");
-	{
-		NP op = copyone(np);
+	NP op = copyone(np);
 
-		np->left = op;
-		np->token = TAKE;
-		np->tt = E_UNARY;
-		name_to_str(np, "&Proc");
-	}
+	np->left = op;
+	np->token = TAKE;
+	np->tt = E_UNARY;
+	name_to_str(np, "&Proc");
 
 /* position in flow of see_id changed
    must now complete types */
@@ -657,9 +707,9 @@ TP asm_symbol(NP np)
 	if (tp->nflgs.f.dot)
 		np->lbl = dot_sym(tp);
 	elif (G.scope)
-		loc_sym(tp, 0);
+		loc_sym(tp);
 	else
-		globl_sym(tp, 0);
+		globl_sym(tp);
 
 	return tp;
 }
@@ -681,9 +731,9 @@ static TP undef_ID(NP np)
 		np->nflgs.f.nheap = 0;				/* symtab owns name */
 
 		if (G.scope)
-			loc_sym(tp, 0);
+			loc_sym(tp);
 		else
-			globl_sym(tp, 0);
+			globl_sym(tp);
 	}
 
 	return tp;
@@ -729,8 +779,8 @@ TP impl_decl(NP np)
 		new_gp(nil, IMPL);
 		np->type = tp->type;
 		to_nct(np);
-		permanent_var(4, (TP)np, GBSS_class);
-		globl_sym(tp, 0);
+		permanent_var((TP)np, GBSS_class);
+		globl_sym(tp);
 		new_class((TP)np, was_class);
 	}
 
@@ -744,7 +794,7 @@ TP undef_symbol(NP np)
 #if FOR_A
 	if (G.lang eq 'a' and B_flags(np))
 	{
-		messagen(0, 0, np, "undefined");
+		messagen(np, "undefined");
 		return impl_decl(np);
 	}
 	else
@@ -755,7 +805,7 @@ TP undef_symbol(NP np)
 #else
 		errorn
 #endif
-			(np, "[1]undefined");
+			(np, "undefined");
 		return undef_ID(np);
 	}
 }
@@ -767,8 +817,6 @@ void see_id(NP np, short context, short usage)
 #if BIP_ASM
 	void asm_offs(NP, TP);
 #endif
-
-	D_(_x, "see_id");
 	if (usage ne FORLVAL)
 		usage = FORSEE;
 
@@ -857,7 +905,7 @@ void see_id(NP np, short context, short usage)
 #endif
 	   )		/* local procedure */
 	{
-		if (tp->cflgs.f.sysc)			/* 01'12 HR */
+		if (tp->xflgs.f.sysc)			/* 01'12 HR */
 			errorn(np, "Cant take address of a %s", graphic[K_SYSC]);
 		insptrto(np);
 	}
@@ -888,37 +936,10 @@ TP xcon_ty(NP lp)
 static
 void ucanon(NP np)	/* somewhat more straightforward */
 {
-	if (np->token eq K_SIZEOF)
-	{
-/*  I needed the true pointer size(4) in the Arr_of type node.
-	so I put the total size if a array in the TAKE expression node
-*/
-		newicon(np, (np->left->type->tflgs.f.saw_array)
-					? np->left->      size
-					: np->left->type->size
-				);
-		np->type = basic_type(SIZE_T, 38);
-		to_nct(np);
-		return;
-	}
-
-	if (np->token eq TOFFSET)	/* should be part of unary_types like TSIZEOF */
-	{
-		TP mp;
-		mp = tlook(np->type->list, np->left);
-		if (mp)
-		{
-			newicon(np, mp->offset);
-			np->type = basic_type(SIZE_T, 40);
-			to_nct(np);
-		}
-		else
-			errorn(np->type, "offsetof: '%s' not member of ", np->left->name);
-		return;
-	}
+	short ltok = np->left->token;
 
 #if FLOAT
-	if (np->left->token eq FCON)
+	if (ltok eq FCON)
 	{
 		float new = np->left->val.f;
 		switch (np->token)
@@ -933,7 +954,7 @@ void ucanon(NP np)	/* somewhat more straightforward */
 
 		return;
 	}
-	elif (np->left->token eq RCON)
+	elif (ltok eq RCON)
 	{
 		double new = getrcon(np->left);
 		switch (np->token)
@@ -950,8 +971,9 @@ void ucanon(NP np)	/* somewhat more straightforward */
 	}
 #endif
 
-/* Here LCON folding */
-	if (np->left->token eq ICON)
+/* Here ICON folding */
+
+	if (ltok eq ICON)
 	{
 		switch (np->token)
 		{
@@ -974,7 +996,7 @@ void ucanon(NP np)	/* somewhat more straightforward */
 			np->type = np->left->type;
 			to_nct(np);
 #if 0 /* BIP_ASM */
-			if (G.lang eq 's' and !G.in_if_x)
+			if (G.lang eq 's' and !G.in_if_X)
 				newicon(np, ~np->left->val.i);
 			else
 #endif
@@ -989,8 +1011,6 @@ static
 void swt_op(NP np)
 {
 	short newtok;
-
-	D_(_x, "swt_op");
 
 /* shame, shame on me!!! botched up reversion */
 	switch (np->token)
@@ -1013,7 +1033,6 @@ static
 void b2i(NP np)
 {
 	long l, r, x;
-	D_(_x, "b2i");
 
 	r = np->right->val.i;
 	l = np->left->val.i;
@@ -1080,8 +1099,6 @@ void b2f(NP np, double l, double r)
 	double x;
 	short ix, isint;
 
-	D_(_x, "b2f");
-
 	isint = 0;
 
 	switch (np->token)
@@ -1129,8 +1146,6 @@ void xcanon(NP np)
 {
 	long l = np->left->val.i;
 	NP onp, tp;
-
-	D_(_x, "xcanon");
 
 	tp = np->right;				/* X_ELSE node */
 
@@ -1274,7 +1289,7 @@ void bcanon(NP np)
 #if BIP_ASM
 		if (np->left->area_info.id ne np->right->area_info.id)
 		{
-			send_msg("%d %d\n", np->left->area_info.id, np->right->area_info.id);
+			console("%d %d\n", np->left->area_info.id, np->right->area_info.id);
 			error("undefined address arithmatic between different areas");
 			return;
 		}
@@ -1323,8 +1338,6 @@ bool right_assoc(NP np)
 	NP lp, rp;
 	short tok;
 
-	D_(_x, "right_assoc");
-
 	lp = np->left;
 	if (lp->token ne np->token)
 		return false;
@@ -1344,7 +1357,6 @@ bool right_assoc(NP np)
 		np->right = lp;
 		lp->left = rp;
 					/* can now fold 2 CONS */
-		/*	warn("right_assoc together right %ld %ld\n", lp->left->type->size, lp->right->type->size); */
 		bcanon(lp);
 	othw
 					/* have 1 CON at l.r -- move to top right */
@@ -1352,7 +1364,6 @@ bool right_assoc(NP np)
 		kp = lp->right;
 		lp->right = rp;
 		np->right = kp;
-		/*	warn("right_assoc top right\n"); */
 		castdefault(lp->left, lp->right, lp->type);
 	}
 
@@ -1365,7 +1376,8 @@ bool left_assoc(NP np)
 	NP rp, lp;
 	short tok;
 
-	D_(_x, "left_assoc");
+#if BOFFS
+#endif
 
 	rp = np->right;
 	if (rp->token ne np->token)
@@ -1419,8 +1431,6 @@ short save_scon(NP np)		/* for the sake of size moved to here from gen.c */
 {
 	NP tp;
 
-	D_(_x, "save_Scon");
-
 	tp = copyone(np);
 	tp->nflgs.f.nheap = np->nflgs.f.nheap;		/* reverses default copyone action. */
 	np->nflgs.f.nheap = 0;
@@ -1447,6 +1457,10 @@ TYPE_FUN leaf_types
 	switch (np->token)
 	{
 	case ID:
+#if BOFFS
+		if is_of(np)
+			return;	/* 21'19 HR: already typed */
+#endif
 		see_id(np, context, usage);
 		if (np->type->token eq ROW)
 			if (context ne FORLAINIT)		/* ANSI: init local arrays */
@@ -1459,11 +1473,7 @@ TYPE_FUN leaf_types
 			np->lbl = save_scon(np);
 		np->type = basic_type(SCON, 44);
 	break;
-	case MEMBER:
-		np->type = default_type(-1, 0);
-		np->token = ID;
-	break;
-	case TSIZEOF:
+	case TSIZE:
 		newicon(np, np->type->size);
 		if (is_ct(np))		/* 12'14 pffffff! v5.2 */
 			freeTn(np->type);
@@ -1535,13 +1545,21 @@ void unary_types(NP np)
 {
 	NP lp; TP tp;
 
+#if BOFFS
+	if is_of(np->left)
+	{
+		c_of(np, np->left);
+		np->val.i = np->left->val.i;
+	}
+#endif
+
 	ucanon(np);			/* confold integrated in form_types */
 						/* its easier when the types are already determined */
 
 	if (np->tt ne E_UNARY)		/* probably done something */
 		return;
 
-	if (external_unary_op(np))		/* s/w dbl: now we know the type for */
+	if (u_overload(np))		/* s/w dbl: now we know the type for */
 		return;						/*	external defined unary operators */
 
 	lp = np->left;
@@ -1549,41 +1567,72 @@ void unary_types(NP np)
 #if FLOAT
 	if (np->cflgs.f.rlop)		/* fpu monops */
 	{
-		mustty(lp, R_ARITH);
+		mustty(lp, R_ARITH,0);
 		tp = basic_type(T_REAL, 56);
 	}
 	else
 #endif
 	switch (np->token)
 	{
-		case TOFFSET:
-		break;
+#if BOFFS
+		case TOFFS:
+		{
+			np->val.i = np->left->val.i;
+			np->token = ICON;
+			np->tt = E_LEAF;
+			freenode(np->left);
+			np->left = nil;
+			tp = basic_type(SIZE_T, 98);
+			break;
+		}
+#endif
+		case K_SIZEOF:	/* 08'19 HR: v6 out of ucanon() */
+		{
+/*  I needed the true pointer size(4) in the Arr_of type node.
+	so I put the total size of an array in the TAKE expression node
+*/
+			newicon(np, (np->left->type->tflgs.f.saw_array)
+						? np->left->      size
+						: np->left->type->size
+					);
+			tp = basic_type(SIZE_T, 38);
+			break;
+		}
 	case POSTINCR:
 		mustlval(lp);
-		mustty(lp, R_SCALAR);
+		mustty(lp, R_SCALAR,1);
 		if (postincdec(np, tp, ASSIGN PLUS, INCR, MINUS))	/* X++ becomes (++X - 1) */
 			return;
 		break;
 	case POSTDECR:
 		mustlval(lp);
-		mustty(lp, R_SCALAR);
+		mustty(lp, R_SCALAR,2);
 		if (postincdec(np, tp, ASSIGN MINUS, DECR, PLUS))
 			return;
 		break;
 	case INCR:
 		mustlval(lp);
-		mustty(lp, R_SCALAR);
+		mustty(lp, R_SCALAR,3);
 		if (incdec(np, tp, ASSIGN PLUS))			/* ++X becomes X+=1 */
 			return;
 		break;
 	case DECR:
 		mustlval(lp);
-		mustty(lp, R_SCALAR);
+		mustty(lp, R_SCALAR,4);
 		if (incdec(np, tp, ASSIGN MINUS))
 			return;
 		break;
 	case DEREF:
-		if (mustty(lp, R_POINTER))
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+		if (lp->token eq ICON and lp->val.i eq 0)
+		{
+			adopt_i(np, lp->type->type);
+			to_cp(np);
+			return;
+		}
+#endif
+		if (mustty(lp, R_POINTER,5))
 		{
 			tp = default_type(-1, 0);			/* error */
 			break;
@@ -1597,6 +1646,15 @@ void unary_types(NP np)
 			see_array(np);
 		return;
 	case TAKE:
+
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+		if (is_cp(lp))
+		{
+			adopt_i(np, lp->type);
+			return;
+		}
+#endif
 		if (lp->token eq TAKE)
 		{
 			if (lp->type->tflgs.f.saw_array)
@@ -1628,7 +1686,7 @@ void unary_types(NP np)
 		if (lp->cflgs.f.see_reg)		/* actually specified 'register' */
 			errorn(lp, "%s reg_var", graphic[ADDRESS]);
 		if (G.v_Cverbosity > 2 and (lp->sc eq K_AUTO or lp->sc eq K_REG) and lp->cflgs.f.is_arg)
-			messagen(0, 0, lp, "&arg");
+			messagen(lp, "&arg");
 
 		tp = basic_type(REFTO, 57);
 		tp->type = lp->type;
@@ -1662,7 +1720,7 @@ void unary_types(NP np)
 			return;
 		}
 #endif
-		mustty(lp, R_ARITH);
+		mustty(lp, R_ARITH,6);
 #if COLDFIRE
 		if (G.Coldfire)
 		{
@@ -1675,7 +1733,7 @@ void unary_types(NP np)
 			cast_up(lp, basic_type(np->ty eq ET_S ? T_INT : T_UINT, 60), "cast_cc unary minus");
 		break;
 	case UPLUS:
-		mustty(lp, R_ARITH);
+		mustty(lp, R_ARITH,7);
 		if (is_CC(lp))			/* 06'11 HR */
 			cast_up(lp, basic_type(np->ty eq ET_S ? T_INT : T_UINT, 61), "cast_cc unary plus");
 		break;
@@ -1684,11 +1742,23 @@ void unary_types(NP np)
 	case ARGCNV:
 		if (np->type->token ne T_VOID)
 		{
-			mustty(lp, R_CC|R_SCALAR);
-			mustty(np, R_CC|R_SCALAR);
+/* 07'19 HR: v6 repair Pure C style offsetof: ne ICON */
+#if OFFS
+		    if (!is_cp(lp))
+#endif
+				mustty(lp, R_CC|R_SCALAR,8);
+
+			mustty(np, R_CC|R_SCALAR,9);
 		}
 
-		if ( is_con(lp->token) and cast_con(lp, np->type, "E2_cast", 999))	/* 09'15 v5.3 */
+		if (    is_con(lp->token)
+		    and (   cast_con(lp, np->type, "E2_cast", 999)	/* 09'15 v5.3 */
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+		         or is_cp(lp)
+#endif
+		        )
+		    )
 		{
 			TP ntp = np->type;
 			if (is_ct(lp))
@@ -1699,34 +1769,34 @@ void unary_types(NP np)
 			return;
 		}
 		if (!G.nmerrors and G.casttab)
-			external_cast(np);
+			c_overload(np);
 		return;				/* type already specified */
 	case NOT:				/* always yields a true boolean */
-		mustty(lp, R_CC|R_SCALAR);
+		mustty(lp, R_CC|R_SCALAR,10);
 		if (!is_CC(lp))
 			cmp_zero(lp);
 		np->type = CC_type(np->left, nil);
 		not_nct(np);
 		return;
 	case BINNOT:
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,11);
 #if COLDFIRE
 		if (G.Coldfire)
 			tp = basic_type(T_ULONG, 62);
 #endif
 		break;
 	case BSWP:			/* 03'09 byte swap */
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,12);
 		tp = basic_type(widen(lp->type->token), 63);
 		cast_up(lp, tp, "Cast bswap");
 		break;
 	case DELAY:			/* 05'13 v4.15 small delay loop */
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,13);
 		tp = basic_type(widen(lp->type->token), 64);
 		cast_up(lp, tp, "Cast delay");
 		break;
 	case HALT:			/* 03'09 stop */
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,14);
 		if (lp->token ne ICON)
 			error("stop needs integer constant");
 		tp = basic_type(T_VOID, 65);
@@ -1735,16 +1805,16 @@ void unary_types(NP np)
 		tp = basic_type(T_VOID, 66);
 		/* fall thru */
 	case GETSR:			/* 03.09 move from SR */
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,15);
 		break;
 	case GETSETSR:		/* 03'09 move from & move to SR */
-		mustty(lp, R_INTEGRAL);
+		mustty(lp, R_INTEGRAL,16);
 		tp = basic_type(T_SHORT, 67);
 		break;
 #if BIP_ASM
 	case REGINDIRECT:		/* 11'09 HR forgot these */
 	case REGINDPLUS:
-	break;
+		break;
 #endif
 	default:
 		CE_X("unknown unary operator '%s'", np->name);
@@ -1778,7 +1848,7 @@ bool must_soft(NP np, TP tp, short op)
 
 			if (op eq (np->token&TOKMASK))	/* if not transformed */
 			{
-				bool bex = external_binary_op(np);
+				bool bex = b_overload(np);
 				if (!bex)
 					error("long '%s' and no function defined for it in 'ahcc_rt.h'", graphic[op]);
 			}
@@ -1807,7 +1877,7 @@ void cold_con(NP np, TP tp)
 #endif
 
 static
-bool can_shift(NP rp, TP tp, TP ltp)
+bool can_shift(NP rp, TP tp, TP ltp)	/* Use only for TIMES and DIV */
 {
 	if (    is_icon(rp->token)
 #if FLOAT
@@ -1816,6 +1886,7 @@ bool can_shift(NP rp, TP tp, TP ltp)
 #if COLDFIRE
 		and !(G.Coldfire and ltp->size < DOT_L)		/* 09'10 HR: must check left size */
 #endif
+	    and rp->val.i > 0			/* 03'18 HR: v6 */
 		and make2pow(&rp->val.i)
 	   )
 		return true;
@@ -1875,12 +1946,24 @@ short side_effects(NP np)
 global
 TYPE_FUN binary_types
 {
-	TP tp, ltp, rtp;
+	TP tp, ltp = nil, rtp = nil;	/* 10'19 HR: v6 nil */
 	NP lp, rp;
 	bool pow2;
 	short op = np->token&TOKMASK;
 	bool assignop = is_ass_op(np->token);
 
+#if BOFFS
+	if is_of(np->left)
+	{
+		c_of(np, np->left);
+		np->val.i = np->left->val.i;
+	}
+	elif is_of(np->right)
+	{
+		c_of(np, np->right);
+		np->val.i = np->right->val.i;
+	}
+#endif
 	if (op ne X_ELSE)		/* confold integrated */
 	{
 		if (assignop)
@@ -1959,7 +2042,6 @@ TYPE_FUN binary_types
 		{								/* make2pow doesnt change off if false */
 			np->token &= (ASSIGN 0);
 			np->token |= op eq TIMES ? SHL : SHR;
-
 			if (!assignop)
 				castdefault(lp, rp, tp);
 			else
@@ -2007,8 +2089,7 @@ TYPE_FUN binary_types
 		    and is2pow(rp->val.i)
 		   )
 		{
-/*			message(0, 0, "mod to and for %lx", rp->val.i);
-*/			np->token = BINAND;
+			np->token = BINAND;
 			rp->val.i -= 1;
 			break;
 		}
@@ -2045,15 +2126,15 @@ TYPE_FUN binary_types
 			return;
 		}
 #endif
-		mustty(lp, R_CC|R_SCALAR);
-		mustty(rp, R_CC|R_SCALAR);
+		mustty(lp, R_CC|R_SCALAR,17);
+		mustty(rp, R_CC|R_SCALAR,18);
 		if (!is_CC(lp))			/* only if types are different */
 			cmp_zero(lp);
 		if (!is_CC(rp))			/*   "     */
 			cmp_zero(rp);
 		np->type = CC_type(np->left, np->right);		/* makes special type ET_?C */
 		not_nct(np);
-		external_binary_op(np);
+		b_overload(np);
 		return;
 	case BINAND:
 	case BINOR:
@@ -2101,8 +2182,33 @@ TYPE_FUN binary_types
 	case INDEX:
 	case PLUS:
 		if (must2ty(np, R_SCALAR)) break;
-		if (is_useless(np, 0))
-			return;
+
+		if (is_useless(np, 0))     return;	/* !!! overwrites *np */
+
+#if BOFFS
+		if (is_of(np) and op eq INDEX)
+		{
+			long l = rp->val.i;
+			NP llp = lp;
+			TP lltp;
+			while(llp)
+			{
+				if (llp->token eq SELECTOR)
+					break;
+
+				llp = llp->left;
+			}
+			if (llp)
+			{
+				lltp = llp->type;
+				if (lltp)
+				{
+					l *= lltp->size;
+					np->val.i += l;
+				}
+			}
+		}
+#endif
 		if (ltp->token eq REFTO or rtp->token eq REFTO)
 		{
 			if (op eq PLUS)
@@ -2174,7 +2280,7 @@ TYPE_FUN binary_types
 
 		np->type = CC_type(np->left, np->right);
 		not_nct(np);
-		external_binary_op(np);
+		b_overload(np);
 		return;
 	case EQUALS:
 	case NOTEQ:
@@ -2186,10 +2292,10 @@ TYPE_FUN binary_types
 			cast_compare(np, lp, rp);
 		np->type = CC_type(np->left, nil);
 		not_nct(np);
-		external_binary_op(np);
+		b_overload(np);
 		return;
 	case X_THEN:
-		mustty(lp, AC_BOOL);
+		mustty(lp, AC_BOOL,19);
 		tp = rp->type;
 		if (!is_CC(lp))
 			cmp_zero(lp);
@@ -2197,9 +2303,9 @@ TYPE_FUN binary_types
 	case X_ELSE:
 	{
 		if (!side_effects(lp))				/* 11'13 HR v5 */
-			if (mustty(lp, R_CC|R_ASSN)) break;
+			if (mustty(lp, R_CC|R_ASSN,20)) break;
 		if (!side_effects(rp))				/* 11'13 HR v5 */
-			if (mustty(rp, R_CC|R_ASSN)) break;
+			if (mustty(rp, R_CC|R_ASSN,21)) break;
 		tp = colonty(np);
 		if (!is_aggreg(tp))
 			castdefault(lp, rp, tp);
@@ -2210,7 +2316,7 @@ TYPE_FUN binary_types
 #endif
 	case ASS:
 		if (   mustlval(lp)
-			or mustty  (lp, R_ASSN) ) break;		/* use R_STRUCT for arrays */
+			or mustty  (lp, R_ASSN,22) ) break;		/* use R_STRUCT for arrays */
 		asn_check (ltp, rp, context);
 
 		tp = ltp;
@@ -2247,15 +2353,13 @@ TYPE_FUN binary_types
 	if (assignop or is_ass(np->token) )		/* 2'17 HR: v5.6 */
 		const_check(np, context);
 
-	external_binary_op(np);
+	b_overload(np);
 }
 
 global
 void call_types(NP np, short context)	/* args in list */
 {
 	NP rp = np->right;
-
-	D_(_x, "call_types");
 
 	if (rp)				 /* voor args */
 	{
@@ -2278,8 +2382,6 @@ void asmsize_type(NP np)		/* only called for operands */
 {
 	TP tp;
 	NP lp = np->left, rp = np->right;
-
-D_(_x, "asmsize_type");
 
 	tp = lp->type;
 
@@ -2310,6 +2412,23 @@ D_(_x, "asmsize_type");
 }
 #endif
 
+static
+void reverse_args(NP arg)
+{
+	#define PS 64
+	NP rij[PS], a = arg;
+	short i = 0;
+
+	if (arg->val.i < PS)
+	{
+		while (a)
+			rij[i++] = a->left, a = a->right;
+		a = arg;
+		while (a)
+			a->left =rij[--i], a = a->right;
+	}
+}
+
 global
 TYPE_FUN form_types
 {
@@ -2317,7 +2436,7 @@ TYPE_FUN form_types
 
 	if (context eq FORLINIT)
 		if (np->eflgs.f.ftyp)
-			messagen(0, 0, np, "form_types already called");
+			messagen(np, "form_types already called");
 		else
 			np->eflgs.f.ftyp = 1;
 
@@ -2327,27 +2446,46 @@ TYPE_FUN form_types
 		switch (np->token)		/* special cases */
 		{
 #if BIP_ASM
-		case ASM_SELECT:
+		case ASM_SELECTOR:
 			form_types(np->left, context, usage);
 			member_type(np);
 			return;
 #endif
-		case SELECT:
+		case SELECTOR:
 			form_types(np->left, context, usage);
+/* print_node(np, "form_types SELECTOR",1,0,1);
+*/
 #if BIP_ASM
 			if (G.lang eq 's')				/* id.w or id.l */
 				asmsize_type(np);
 			else
 #endif
 				member_type(np);
+
+/* 07'19 HR: v6 repair Pure C style offsetof */
+#if OFFS
+			if (np->left)
+			if (is_cp(np->left))
+			{
+				long v = np->val.i;
+				adopt_i(np, np->type);
+				np->val.i += v;
+			}
+#endif
 			return;
+
 		case CALL:
 		{
-			call_types(np, context);
+			TP mp;
 			callee_type(np, context);
+			call_types(np, context);
 			function_type(np, context);
 			match_args(np);			/* also do argassigns if proc is local */
-			arg_regs(np);
+			mp = np->left->type;			/* name expr */
+			if (mp and mp->xflgs.f.pasc)	/* 09'19 HR: v6 correct pascal behaviour */
+				reverse_args(np->right);
+			else
+				arg_regs(np);
 
 #if FU_TREE
 			if (    G.ah_project_help
@@ -2453,7 +2591,7 @@ short ret_context(TP typ)
 	else
 #endif
 	if (    typ->token eq REFTO
-/*		and typ->cflgs.f.cdec eq 0		/* 09'10 HR */
+/*		and typ->xflgs.f.cdec eq 0		/* 09'10 HR */
 */	   )
 		return INA0;
 	else
@@ -2464,10 +2602,9 @@ global
 void ret_expr(NP np, TP typ)
 {
 	if (is_aggreg(typ))
-	{
-		D_(_x, "ret_stru");
 		str_expr(np, typ);
-	othw
+	else
+	{
 		short context = ret_context(typ);
 		Cast(np, typ, IMPCNV, "Ret_cast");
 		do_expr(np, context);

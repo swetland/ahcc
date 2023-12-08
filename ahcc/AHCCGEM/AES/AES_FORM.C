@@ -20,7 +20,7 @@
 
 #include "aespb.h"
 
-short G_decl form_do(void *tree,short item)
+short  form_do(void *tree,short item)
 {
 	short io;
 	SETACTL(50,1,1,1,0);
@@ -29,7 +29,7 @@ short G_decl form_do(void *tree,short item)
 	return io;
 }
 
-short G_decl form_dial(short flag,short lx,short ly,short lw,short lh,
+short  form_dial(short flag,short lx,short ly,short lw,short lh,
                        short bx,short by,short bw,short bh)
 {
 	short ii[9], io;
@@ -41,7 +41,7 @@ short G_decl form_dial(short flag,short lx,short ly,short lw,short lh,
 	return io;
 }
 
-short G_decl form_alert(short button,const char *alstr)
+short  form_alert(short button,const char *alstr)
 {
 	short io;
 	SETACTL(52,1,1,1,0);
@@ -50,7 +50,7 @@ short G_decl form_alert(short button,const char *alstr)
 	return io;
 }
 
-short G_decl form_error(short num)
+short  form_error(short num)
 {
 	short io;
 	SETACTL(53,1,1,0,0);
@@ -59,7 +59,7 @@ short G_decl form_error(short num)
 	return io;
 }
 
-short G_decl form_center(void *tree,short *cx,short *cy,
+short  form_center(void *tree,short *cx,short *cy,
                            short *cw,short *ch)
 {
 	short io[5];
@@ -73,7 +73,7 @@ short G_decl form_center(void *tree,short *cx,short *cy,
 	return io[0];
 }
 
-short G_decl form_keybd(void *tree,short item,short next,short teken,
+short  form_keybd(void *tree,short item,short next,short teken,
                             short *nextob,short *nextteken)
 {
 	short ii[3], io[3];
@@ -86,7 +86,7 @@ short G_decl form_keybd(void *tree,short item,short next,short teken,
 	return io[0];
 }
 
-short G_decl form_button(void *tree,short item,short clks,short *nextob)
+short  form_button(void *tree,short item,short clks,short *nextob)
 {
 	short ii[2], io[2];
 	SETACTL(56,2,2,1,0);

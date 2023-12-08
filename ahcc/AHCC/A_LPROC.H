@@ -26,7 +26,7 @@ global void loc_proc(TP xp, short tok)
 {
 	FP	new;
 	TP	bp, tp = xp->type;
-	short l1 = new_albl(1);
+	short l1 = new_lbl();
 
 	/* local procedure body definition (ANS_ARGS only) */
 	D_(D, "LPROC");
@@ -44,11 +44,11 @@ global void loc_proc(TP xp, short tok)
 /*	name_to_str((NP)G.prtab, tok eq L_PROC ? "local proc" : "primary stmt");
 */
 	xp->sc = K_STATIC;
-	xp->lbl = new_albl(2);	/* name expression node */
+	xp->lbl = new_lbl();	/* name expression node */
 #if GEN_PO
 	xp->area_info.class = TEXT_class;
 #endif
-	G.prtab->fretl = new_albl(3); /* MUST directly after above (L1 & L2) */
+	G.prtab->fretl = new_lbl(); /* MUST directly after above (L1 & L2) */
 
 	new_gp(nil, PROC);		/* make first gnode for code output */
 	gp->name  = xp->name;
@@ -138,7 +138,7 @@ global void loc_proc(TP xp, short tok)
 		G.scope->b_size  = bp->maxlocs;
 		bp->outer = nil;
 		free(bp);
-		def_albl(l1, 1);
+		def_lbl(l1);
 		G.flow_chart = svflow, G.fltab = svfl;
 	}
 }

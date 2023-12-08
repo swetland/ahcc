@@ -488,8 +488,6 @@ size_t inita(TP tp, short area, long maxi)
 /* init 1 long with the size of the initializer,
    init 1 ref to char with a ref to the initializer (must be a SCON) */
 
-#define TRC(a) message(0,1, "-= " #a " =-")
-
 #if FOR_A
 static
 size_t init_str(short area)
@@ -600,7 +598,7 @@ size_t inits(TP xp, short area)
 			advnode();
 			if (cur->token eq LABEL)
 			{
-				message(0, 0, "g_init : %s", id->name);
+				message("g_init : %s", id->name);
 				freeXn(id), fadvnode();
 			}
 		}
@@ -735,7 +733,7 @@ void new_class(TP np, short new)
 
 /* variable with permanent extent */
 global
-void permanent_var(short which, TP np, short class)
+void permanent_var(TP np, short class)
 {
 	long sz;
 	TP tp;
@@ -768,8 +766,8 @@ void permanent_var(short which, TP np, short class)
    became overwritten. */
 
 		if (tp->aln)
-			gp->size = 2,		/* we dont know how much of which basic size. */
-			sz /= 2;			/* type->size is the whole */
+			gp->size = DOT_W,		/* we dont know how much of which basic size. */
+			sz /= DOT_W;			/* type->size is the whole */
 		else
 			gp->size = 1;
 
@@ -802,7 +800,7 @@ void auto_init(TP xp, NP ap, NP e1, short context)
 		ap->tt = E_BIN;
 		if (G.prtab->level > 1)		/* not args */
 			G.scope->b_locs += loc_size(gpbase, xp, &G.scope->b_size, &G.scope->b_regs);
-		loc_sym(xp, 0);
+		loc_sym(xp);
 		next_gp(ap);
 		do_expr(ap, context);	/* for local scalar init */
 	}
@@ -822,7 +820,7 @@ bool static_init(TP xp)
 	{
 		tp->tflgs.f.formal = 0;			/* 04'09 */
 		class = xp->sc eq K_GLOBAL ? GDATA_class : DATA_class;
-		permanent_var(1, xp, class);
+		permanent_var(xp, class);
 		fadvnode();
 		std_area_end(xp, class);
 		if (!g_init(tp, class))
@@ -833,7 +831,7 @@ bool static_init(TP xp)
 	othw
 		class = xp->sc eq K_GLOBAL ? GBSS_class : BSS_class;
 		warn_const(xp);
-		permanent_var(2, xp, class);
+		permanent_var(xp, class);
 		std_area_end(xp, class);
 	}
 
@@ -862,9 +860,9 @@ NP a_init(TP op)  /* local aggreg init only */
 	xp = copyTnode(op);			/* symbol table entry for static initializer */
 	xp->sc = K_STATIC;
 	xp->rno = 0;
-	permanent_var(3, xp, DATA_class);	/* sets also new_lbl() in xp->lbl */
+	permanent_var(xp, DATA_class);	/* sets also new_lbl() in xp->lbl */
 	new_name(xp, "__%d", xp->lbl);
-	loc_sym(xp, 1);
+	loc_sym(xp);
 	std_area_end(xp, DATA_class);
 	g_init(xp->type, DATA_class);
 	next_gp(add_tseg());
@@ -987,18 +985,22 @@ TP asm_type(void)
 	return basic_type(T_LONG, 10);		/* identifiers in operands without .w or .l (PASM compatible) */
 }
 
-short alert_text(char *t, ... );
-
 global
 TP default_type(short sc, short q)
 {
-	if (sc eq K_EXTERN and !q)
+	TP rv;
+/*	if (sc eq K_EXTERN and !q)	/* 07'19 HR v6: Pure C doesnt warn */
 		warn("no declarer for %s object", graphic[sc]);
+*/
+	rv =
 #if FOR_A
-	return  basic_type(T_DEF, 11);
+		basic_type(T_DEF, 11);
 #else
-	return  basic_type(T_INT, 11);
+		basic_type(T_INT, 11);
 #endif
+	rv->tflgs.f.dflt = 1;		/* 07'19 HR: v6 avoid spurious no declarator for ... */
+	rv->fl.ln = line_no;			/* 07'19 HR: v6 */
+	return rv;
 }
 
 #if FOR_A
@@ -1027,8 +1029,15 @@ bool same_int(TP ltp, TP rtp)
 	There are so many reasons for returning false. So I decided
     to reverse truth value and to put meaning into falsehood.
 */
+
+#if C_DEBUG
+#define leave(l,x) { console("[%d]unsim %d\n", l, x); return x;}
+#else
+#define leave(l,x) return x;
+#endif
+
 global
-short similar_type(short lvl, short q, TP lp, TP rp, short proty, short init)	/* prototyping; geheel herziene 'same_type' */
+short similar_type(short lvl, short q, TP lp, TP rp, short proty, short in)	/* prototyping; geheel herziene 'same_type' */
 {
 	/* prototyping: maak universeel */
 	/* allways starts with ->type's if any */
@@ -1047,11 +1056,11 @@ short similar_type(short lvl, short q, TP lp, TP rp, short proty, short init)	/*
 #if FOR_A
 				if (!same_int(l, r) )
 #endif
-				 																return 1;
+				 														leave(lvl, 1)
 
 			if (l->token ne ROW)			/* index sizes may differ */
 				if (	l->size and r->size
-				    and l->size ne  r->size )									return 2;
+				    and l->size ne  r->size )							leave(lvl, 2)
 
 			/* equal token pair at this point */
 			aggreg = is_aggreg(l), pty = is_code(l);
@@ -1059,27 +1068,27 @@ short similar_type(short lvl, short q, TP lp, TP rp, short proty, short init)	/*
 			if (    (pty or aggreg)
 			    and l->nflgs.f.brk_l eq 0
 			   )
-				if (similar_type(lvl+1, q, l->list, r->list, pty, init))			return 3;
+				if (similar_type(lvl+1, q, l->list, r->list, pty, in))	leave(lvl, 3)
 
 			/* names in func decls may differ so we dont look at them */
 			/* aggreg tag_names may have been generated so ignore them to   */
 			/* and if only equivalency is the question, well */
 			if (l->token eq ID)
-				if (!proty and strcmp(l->name, r->name) ne 0)					return 4;
+				if (!proty and SCMP(200, l->name, r->name) ne 0)		leave(lvl, 4)
 			/* 05.13 v4.15 */
 
-			if (q and !(init or proty))			/* 11'09 HR: consider qualifiers */
+			if (q and !(in or proty))			/* 11'09 HR: consider qualifiers */
 			{
 				/* only dismiss if right is less restrictive */
 				if (    l->cflgs.f.qc eq 0
-				    and r->cflgs.f.qc ne 0)									return 5;
+				    and r->cflgs.f.qc ne 0)								leave(lvl, 5)
 
 				if (    l->cflgs.f.qv eq 0
-				    and r->cflgs.f.qv ne 0)									return 6;
+				    and r->cflgs.f.qv ne 0)								leave(lvl, 6)
 
 			}
 			if (!aggreg)	/* geen taglists bekijken */
-				if (similar_type(lvl+1, q, l->next, r->next, proty, 0) ne 0)	return 8;
+				if (similar_type(lvl+1, q, l->next, r->next, proty, 0))	leave(lvl, 8)
 			if (l eq l->type or r eq r->type)
 				break;
 
@@ -1087,7 +1096,7 @@ short similar_type(short lvl, short q, TP lp, TP rp, short proty, short init)	/*
 			r = r->type;
 		}
 
-		if (l or r) 	/* lost synchronization */								return 9;
+		if (l or r) 	/* lost synchronization */						leave(lvl, 9)
 	}
 
 	return 0;		/* OK */
@@ -1108,8 +1117,7 @@ void make_t(TP tp, short tok, Cstr nm)
 {
 	tp->token = tok;
 	tp->nt = TLNODE;
-/*	tp->nflgs.f.bas = 1;
-*/	tp->nflgs.f.res = 1;
+	tp->nflgs.f.res = 1;
 	name_to_str(tp, nm);
 }
 
@@ -1225,38 +1233,34 @@ TP bas_type(short btype)
 #endif
 		name_to_str(&scon_ptr, "scon_ptr to");
 		to_type(&scon_ptr, REFTO);
-/*		scon_ptr.nflgs.f.bas = 1;
-*/		scon_ptr.nflgs.f.res = 1;
+		scon_ptr.nflgs.f.res = 1;
 		scon_ptr.nt = TLNODE;
 		to_nct(&scon_ptr);
-		scon_ptr.type = basic_type(G.k_char_is_unsigned ? T_UCHAR : T_CHAR, 100+which);
+		scon_ptr.type = basic_type(G.k_char_is_unsigned ? T_UCHAR : T_CHAR, 100);
 
 #if FOR_A
 		name_to_str(&nil_ptr, "nil_ptr to");
 		to_type(&nil_ptr, REFTO);
-/*		nil_ptr.nflgs.f.bas = 1;
-*/		nil_ptr.nflgs.f.res = 1;
+		nil_ptr.nflgs.f.res = 1;
 		nil_ptr.nt = TLNODE;
 		to_nct(&nil_ptr);
-		nil_ptr.type = basic_type(T_VOID, 200+which);
+		nil_ptr.type = basic_type(T_VOID, 200);
 
 		name_to_str(&v_ptr, "generic_ptr");
 		to_type(&v_ptr, REFTO);
 		v_ptr.nt = TLNODE;
-/*		v_ptr.nflgs.f.bas = 1;
-*/		v_ptr.nflgs.f.res = 1;
+		v_ptr.nflgs.f.res = 1;
 		to_nct(&v_ptr);
-		v_ptr.type = basic_type(T_VOID, 300+which);
+		v_ptr.type = basic_type(T_VOID, 300);
 #endif
 
 		name_to_str(&func_int, "func_rtn");
 		to_type(&func_int, T_PROC);
-/*		func_int.nflgs.f.bas = 1;
-*/		func_int.nflgs.f.res = 1;
+		func_int.nflgs.f.res = 1;
 		func_int.nt = TLNODE;
 #if FOR_A
 		if (G.lang eq 'a')
-			func_int.type = basic_type(T_VOID, 400+which);
+			func_int.type = basic_type(T_VOID, 400);
 		else
 			func_int.type = default_type(-1, 0);
 		/* default should allways have been 'void' */
@@ -1330,8 +1334,7 @@ TP bas_type(short btype)
 	#endif
 		rv->nt = TLNODE;
 		to_type(rv, btype);
-/*		rv->nflgs.f.bas = 1;
-*/		rv->nflgs.f.res = 1;
+		rv->nflgs.f.res = 1;
 		name_to_str(rv, btbl[bm].text);
 		graphic[btype] = rv->name;		/* for displaying */
 
@@ -1392,8 +1395,7 @@ TP CC_type(NP lp, NP rp)
 	short ty = ET_CC;
 	TP tp = copyTone(basic_type(T_BOOL, 14));		/* must copy because of ty */
 
-/*	tp->nflgs.f.bas = 0;
-*/	tp->nflgs.f.res = 0;
+	tp->nflgs.f.res = 0;
 	ty = CC_ty((NP)lp->type, rp ? (NP)rp->type : nil);
 	tp->ty = ty;
 	return tp;
@@ -1557,7 +1559,7 @@ NP e_temp_var(TP type)
 		G.scope->b_size += type->size;
 		tp->offset = -G.scope->b_size;
 		set_vreg(tp);
-		loc_sym(tp, 0);
+		loc_sym(tp);
 		fp = t_to_gx(tp, nil);
 		if (fp)
 		{

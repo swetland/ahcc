@@ -69,7 +69,8 @@ short edcyc = 0;  	/* current cyclic edit field for use with CNTRL_I */
 #include "pdb.h"
 #endif
 
-externRECT jrect;
+extern
+RECT jrect;
 
 #ifdef MNHOOKS
 /* object numbers (independent of resource sequence) */
@@ -181,6 +182,9 @@ OpEntry settab[]=
 #if RTUN
 	{"RTUN=%d\n",6,&cfg.rtun,0,0,RTUN,AMENU},		/* empty undo after return */
 #endif
+#ifdef SOPT
+	{"SOPT=%d\n",6,&cfg.s,0,0,SOPT,AMENU},			/* Use cipboard */
+#endif
 	{"AOPT=%d\n",6,&cfg.a,0,0,AOPT,AMENU},			/* autosave config */
 
 #if TEXTFILE || BINARY
@@ -246,10 +250,10 @@ void change_font(IT *wt, bool small)
 	if (small)
 	{
 		wt->points=hpoints;
-		vst_height(wt->hl,hpoints,&dum,&dum,&wt->unit.w,&wt->unit.h);
+		vst_height(wt->vhl,hpoints,&dum,&dum,&wt->unit.w,&wt->unit.h);
 	othw
 		wt->points=points;
-		vst_height(wt->hl, points,&dum,&dum,&wt->unit.w,&wt->unit.h);
+		vst_height(wt->vhl, points,&dum,&dum,&wt->unit.w,&wt->unit.h);
 	}
 
 	if (wt ne &deskw)
@@ -270,78 +274,89 @@ void change_font(IT *wt, bool small)
 global
 void flip_lnrs(IT *w, bool new)
 {
+	w->mg.w  = MINMARGIN;
+
 	if (new)		/* present */
 	{
-		w->mgw.x  = MINMARGIN;
 		w->den    = denotation_space(w->view.sz.h, 10);
-		w->mgw.x += (w->den + 1) * w->unit.w;
+		w->mg.w += (w->den + 1) * w->unit.w;
 	}
-	else			/* absent */
-		w->mgw.x  = MINMARGIN;
 
 	get_work(w);
 }
 
 /* black boxes */
-globalCstr get_fistr(short cur)
+global
+Cstr get_fistr(short cur)
 {
 	if (cur eq 0) cur = edcur;
 	return dsfind[cur]->text;
 }
-globalCstr get_repstr(void)
+global
+Cstr get_repstr(void)
 {
 	return dsrep->text;
 }
-globalshort get_repl(void)
+global
+short get_repl(void)
 {
 	return strlen(dsrep->text);
 }
 #if MTEDITOR or MBEDITOR
-globalbool is_all(void)
+global
+bool is_all(void)
 {
 	return (pkit.tree[DSALL   ].state&SELECTED) ne 0;
 }
 #endif
 
 #ifdef MNFCOMP
-globalvoid get_cpfstr(S_path *s1, S_path *s2)
+global
+void get_cpfstr(S_path *s1, S_path *s2)
 {
 	xstr_to_s(pkit.tree, DSCPF1STR, DSCPF1XTR, s1);
 	xstr_to_s(pkit.tree, DSCPF2STR, DSCPF2XTR, s2);
 }
 
-globalbool is_fdeep(void)
+global
+bool is_fdeep(void)
 {
 	return (pkit.tree[DSFDEEP].state&SELECTED) ne 0;
 }
 #endif
 
 #ifdef MNMULT
-globalvoid get_mulstr(S_path *s1)
+global
+void get_mulstr(S_path *s1)
 {
 	xstr_to_s(pkit.tree, DSMULSTR, DSMULXTR, s1);
 }
 
-globalbool is_mult(void)
+global
+bool is_mult(void)
 {
 	return (pkit.tree[DSMULT  ].state&SELECTED) ne 0;
 }
-globalbool is_talk(void)
+global
+bool is_talk(void)
 {
 	return (pkit.tree[DSMTALK].state&SELECTED) ne 0;
 }
-globalbool is_deep(void)
+global
+bool is_deep(void)
 {
 	return (pkit.tree[DSMDEEP].state&SELECTED) ne 0;
 }
-globalbool is_once(void)
+global
+bool is_once(void)
 {
 	return (pkit.tree[DSMONCE].state&SELECTED) ne 0;
 }
 #endif
 
 #ifdef DSPROJ
-globalbool is_project(void)
+global
+bool is_project(void)
 {
 	return (pkit.tree[DSPROJ  ].state&SELECTED) ne 0;
 }
@@ -419,7 +434,8 @@ uchar aaaalower[STR_MAX];	/* tbv find multiple */
 global
 S_path fdum = {"DUMMY"};	/* voor alleen folder gevraagd */
 
-globalIT *jrnlwin;
+global
+IT *jrnlwin;
 
 static
 char slash [2] = "\\",
@@ -792,7 +808,7 @@ bool comp_file(char *fn1, char *fn2, short fun, short how)
 {
 	if (break_in)
 		return true;
-		
+
 	elif (fun eq 0)
 	{
 		char *f1, *f2;
@@ -809,7 +825,7 @@ bool comp_file(char *fn1, char *fn2, short fun, short how)
 #ifdef MNFDIFF
 					char *dtxt = how ? Diffing : Mismatch;
 					send_msg("%s %s :: %s\n", dtxt, fn1, fn2);
-					
+
 					if (how)
 					{
 						IT *wr = open_X(fn2);
@@ -918,17 +934,17 @@ void comp_folder(short how)
 	if (pkit.cp1dir.s[0] and pkit.cp2dir.s[0])		/* 07'14 HR v5.1 */
 	{
 		send_msg("%s '%s' :: '%s'\n", ctxt, pkit.cp1dir.s, pkit.cp2dir.s);
-	
+
 		DIRcpy(&dir1, pkit.cp1dir.s);
 		get_wild(dir1.s, wild);
 		DIRcpy(&dir2, pkit.cp2dir.s);
 		get_wild(dir2.s, wilddum);
-	
+
 		send_msg("Unequal files and files in first directory only\n");
 		comp_in_dir(dir1.s, dir2.s, wild, 0, 0, how);
 		send_msg("Files in second directory only\n");
 		comp_in_dir(dir2.s, dir1.s ,wild, 0, 1, 0);
-	
+
 		if (is_fdeep())
 		{
 			send_msg("total %d file%s ",tfls,pluralis(tfls));
@@ -1003,7 +1019,6 @@ void dlines (IT *w)
 	{
 		/* perform any check on element s */
 		short r;
-		short alert_qtext(bool stop, char *t, ... );
 
 		handle_space(t, s->xtx);
 		r = alert_qtext(true, "L%ld = '%s'", s->xn, t);
@@ -1060,6 +1075,7 @@ DEXIT kit_do		/* IT *w, short obno */
 	{
 		switch (obno)
 		{
+
 			case DSFORWRD:
 			case DSBCKWRD:
 #ifdef DSW
@@ -1180,9 +1196,10 @@ void Get_Fted(OBJECT *dsb, short i, short item)
 void *subst_objects( OBJECT  *obs, bool menu );
 void  subst_free   ( USERBLK *ublks );
 
-globalUSERBLK *ubdbs = nil;
 global
-void invoke_kit(void)
+USERBLK *ubdbs = nil;
+global
+VpV invoke_kit
 {
 	short i;
 
@@ -1214,11 +1231,9 @@ void invoke_kit(void)
 		pkit.tree[CO8].state |= DISABLED;
 	#endif
 #endif
-#if ! COLDFIRE
 	#ifdef CO1
 		pkit.tree[CO1].state |= DISABLED;
 	#endif
-#endif
 
 #ifdef MNHOOKS
 	loop (i,N_WH)
@@ -1255,7 +1270,6 @@ void invoke_kit(void)
 	               binkit_fresh,
 	       #endif
 	               kit_do);
-
 }
 
 global
@@ -1515,12 +1529,12 @@ short handle_space(char *o, char *i)
 		else
 			*o++ = *i++;
 	}
-	
+
 	if (o > so)
 		if (*(o-1) eq ' ')
 			o--;
 
-	*o = 0;	
+	*o = 0;
 
 	return o - so;
 }
@@ -1534,7 +1548,6 @@ short handle_space(char *o, char *i)
 
 #include "diff.h"
 
-
 static
 void show_2(STMC *s1, STMC *s2)
 {
@@ -1542,15 +1555,15 @@ void show_2(STMC *s1, STMC *s2)
 	if (s1)
 	{
 		handle_space(t1, s1->xtx);
-		console("e1-=%s=-\n",t1);
+		send_msg("e1-=%s=-\n",t1);
 	}
 	if (s2)
 	{
 		handle_space(t2, s2->xtx);
-		console("e2-=%s=-\n",t2);
+		send_msg("e2-=%s=-\n",t2);
 	}
 
-	console("====\n"); Cconin();
+	send_msg("====\n"); Cconin();
 }
 
 global
@@ -1617,7 +1630,7 @@ void do_Search(IT *w,short mt)
 					*st=0;
 
 					loop(i,FBS)
-						if ( strcmp(dsfind[i]->text,selection) eq 0) break;
+						if ( SCMP(10, dsfind[i]->text,selection) eq 0) break;
 
 					wdial_off(kit);		/* cursor off */
 
@@ -1760,7 +1773,7 @@ void do_Search(IT *w,short mt)
 	#endif
 	#ifdef MNDIFF				/* HR: Basicly only for testing */
 			case MNDIFF:
-				diff_2(w);		/* write diffs to console. */
+				diff_2(w);		/* write diffs to journal. */
 			break;
 	#endif
 	#ifdef MNCHECK				/* HR: Basicly only for testing */

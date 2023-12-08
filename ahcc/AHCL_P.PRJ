@@ -20,7 +20,7 @@ shell\ahcl_p.ttp
 .C [-W-par -W-stv -W-sig -W-cln]	; warning level must be 2 !!
 .L [-S=8192]
 =
-pcvstart.o
+ahcstart.o
 shell\shell.c	(shell\shell.h)		;  ttp shell
 shell\tos_call.s		; passes parameters argc & argv to module
 						; in stead of program
@@ -37,8 +37,4 @@ common\hierarch.c		; hierarchic name manipulation
 common\aaaa_lib.c
 common\ipff.c
 
-pcextlib.lib
-
-common\ahcm.c		; non fragmenting and thread save memory allocator
-pcstdlib.lib
-pctoslib.lib
+ahccstd.lib

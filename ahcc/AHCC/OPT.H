@@ -43,7 +43,6 @@ typedef struct asmtable
 #define OPHASH 127
 
 Wstr	optimize(void);
-short 	is_lbl		(Cstr);
 BP		getsym		(Cstr),
 		mksym		(Cstr);
 void	add_debug	(IP ip, Cstr s);

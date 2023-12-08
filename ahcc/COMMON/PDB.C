@@ -168,7 +168,7 @@ DPP pdb_find(DPP root, Cstr name)
 
 	while (dp)
 	{
-		if (strcmp(name, dp->data->name) eq 0)
+		if (SCMP(50,name, dp->data->name) eq 0)
 			return dp;
 
 		dp = dp->dnext;
@@ -178,7 +178,7 @@ DPP pdb_find(DPP root, Cstr name)
 }
 
 global
-void pdb_fdepend(DPP *tto, Cstr toname, Cstr name, short fileno, short which)
+void pdb_fdepend(DPP *tto, Cstr toname, Cstr name, short fileno)
 {
 	DPP to = *tto, dp, root;
 
@@ -311,7 +311,7 @@ Cstr pdb_file_by_number(DPP root, short number)
 		dp = dp->dnext;
 	}
 
-	return "~~~";
+	return "~~7";
 }
 
 global
@@ -363,7 +363,7 @@ void pdb_write_dep(void)
 	fp = fopen(depfn.s, "w");
 	setvbuf(fp, buf, _IOFBF, 8192);			/* set full buffereing (Doesnt flush at newline!!!) */
 	if (fp eq nil)
-		send_msg("Cant create %s\n", depfn.s);
+		send_msg("Cannot create %s\n", depfn.s);
 	else
 	{
 		extern Cstr ahcc_version;
@@ -485,7 +485,7 @@ short bfind_ide(PDB *x)
 	{
 		last = x;
 		if (r eq x->name) return 0; /* same address is surely equal */
-		cmp = strcmp(r, x->name);
+		cmp = SCMP(51,r, x->name);
 		if (cmp < 0)
 			return bfind_ide(x->less);
 		if (cmp > 0)
@@ -530,7 +530,7 @@ void ins_ide(PDB_BASE *ides, PDB *x)
 	x->pnext = nil;
 }
 
-void console(char *,...);
+void console(Cstr, ...);
 
 global
 PDB * pdb_new_ide(PDB_BASE *ides, Cstr ide, short file, long line, short scope)
@@ -641,18 +641,18 @@ DPP pdb_read_dep(void)
 		ipff_in(s);
 		sk();
 		str(rstr);
-		if (strcmp(rstr,"ahcc_dep") eq 0)
+		if (SCMP(52,rstr,"ahcc_dep") eq 0)
 		{
 			sknl();
 			str(rstr);
-			if (strcmp(rstr, "files") eq 0)
+			if (SCMP(53,rstr, "files") eq 0)
 			{
 				sk();
 				filecount = idec();
 				sk();
 				str(rstr);
 
-				if (strcmp(rstr, "dependencies") eq 0)
+				if (SCMP(54,rstr, "dependencies") eq 0)
 				{
 					if (SHL_cfg.v)
 						send_msg("%s present\n", rstr);
@@ -666,7 +666,7 @@ DPP pdb_read_dep(void)
 
 				sk();
 				str(rstr);
-				if (strcmp(rstr, "identifiers") eq 0)
+				if (SCMP(55,rstr, "identifiers") eq 0)
 				{
 					if (SHL_cfg.v)
 						send_msg("%s present\n", rstr);
@@ -676,7 +676,7 @@ DPP pdb_read_dep(void)
 	#if FU_TREE
 				sk();
 				str(rstr);
-				if (strcmp(rstr, "call_tree") eq 0)
+				if (SCMP(56,rstr, "call_tree") eq 0)
 				{
 					if (SHL_cfg.v)
 						send_msg("%s present \n", rstr);

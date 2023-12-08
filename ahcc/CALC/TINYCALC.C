@@ -1,19 +1,19 @@
 /*  Copyright (c) 2013 - present by Henk Robbers Amsterdam.
  *
- * This file is part of AHCC.
+ * This file is part of TINYCALC.
  *
- * AHCC is free software; you can redistribute it and/or modify
+ * TINYCALC is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * AHCC is distributed in the hope that it will be useful,
+ * TINYCALC is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with AHCC; if not, write to the Free Software
+ * along with TINYCALC; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
@@ -23,19 +23,37 @@
  *  use F_x in a console
  */
 
+#define SHOW 1
+
+#if SHOW
+#include <stddef.h>			/* for offsetof */
+#endif
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+
+#include "../common/f_x.h"
 
 #if __AHCC__			/* That is: on my ATARI */
-#include "common/F_x.h"
-#define V "2.01"
+#define V "2.03"
 #else
-#include "f_x.h"
-#define V "3.0"
+#define V "3.4"
+#define __AHCC__ 0
 #endif
 
+#define Built "V60"
+
+enum
+{
+	hmax = 25,
+	smax = 80
+} EN;
+
 static
-char inp[80];
+char inp[smax];
+typedef void VpV(void);
+
+#define global
 
 global
 int main(void)
@@ -43,10 +61,35 @@ int main(void)
 	Token val; char *s;
 	double x = 10, y = 2;
 
-	printf("Tiny calculator v" V "\n"
+	printf("Tiny calculator %s\n"
 	       "x = %g, y = %g\n"
-	       "Enter formula:\n", x, y);
+#if __APPLE__
+	       "__APPLE__ = %d"
+#else
+		   "__AHCC__  = %d"
+#endif
+		   "\n"
+	       "Enter formula:\n", Built, x, y,
+#if __APPLE__
+	       __APPLE__
+#else
+		   __AHCC__
+#endif
+	       );
+#if SHOW
+	printf(
+		   "offsetof val = %ld, "
+		   "size of double = %ld, "
+		   "size of float = %ld, "
+		   "size of enum = %ld\n",
+		   offsetof(Token, v),
+		   sizeof(double),
+		   sizeof( float),
+		   sizeof(EN)
+		  );
+#endif
 
+/* being able to go back in history is good when you can actually edit in a line */
 	do{
 		printf(">");
 		s = inp;

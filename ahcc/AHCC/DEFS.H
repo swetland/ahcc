@@ -169,12 +169,9 @@
 	DTOK(B_ULE)
 	DTOK(B_UGT)
 
-	DTOK(ERRNODE)
-
 /*  used for storage class in nodes (not in DECL.C, no category);
 	must produce positive char value */
 	DTOK (PROT)
-	DTOK (PROT_USED)
 	DTOK (ENUM)
 
 	/* reserved words and operaters */
@@ -205,10 +202,10 @@
 	OP (":",	0, 0, 0			,X_ELSE, 0)
 
 	KW ("...",	0,DECL|BASIC|PLAIN, 0 ,K_VARGL, 0)
-	OP (".",	0, 0, 0			,SELECT, 0)
+	OP (".",	0, 0, 0			,SELECTOR, 0)
 
 #if BIP_ASM
-	OP ("@",	0, 0, 0			,ASM_SELECT, 0)
+	OP ("@",	0, 0, 0			,ASM_SELECTOR, 0)
 #endif
 
 	OP ("\"",	SPCL, 0, 0		,QUOTE, 0)
@@ -228,7 +225,7 @@
 
 	OP ("-=",	ASOP, 0, +3		,ASMINUS, 0)
 	OP ("--",	UNOP, 0, 0		,DECR, 0)
-	OP ("->",	0, 0, 0			,ARROW, 0)
+	OP ("->",	0, 0, 0			,VIA, 0)
 	OP ("-",	UNOP, 0, 4		,MINUS, NEGATE)
 
 	OP ("*=",	ASOP, 0, +1		,ASTIMES, 0)
@@ -254,11 +251,12 @@
 	OP ("!=",	C_NA|COMPARE, XC, 7 ,NOTEQ,B_NE)
 	OP ("!",	UNOP, XC, 0			,NOT,0)
 
-#if FOR_A
+#if 0 /* FOR_A */
 	OP ("~",	UNOP, 0, 0			,FLO, 0)
 #else
 	OP ("~",	UNOP, 0, 0			,BINNOT, 0)	/* 05'13 different meaning in ASM */
 #endif
+
 	OP ("^=",	ASOP, 0, +1			,ASBINEOR, 0)
 	OP ("^",	C_A, 0, 9			,BINEOR, 0)
 
@@ -407,8 +405,6 @@
 
 #if FOR_A
 	OPS("ge",		P_KW, GTEQ)
-#endif
-#if FOR_A
 	KW ("global",	0, DECL|SC, P_KW		,K_GLOBAL, 0)
 #endif
 
@@ -422,13 +418,14 @@
 	KW ("int",		0, DECL|BASIC|PLAIN,0	,K_INT, 0)
 
 #if FOR_A
-	KW ("inv",		0,0,0					,BINNOT, 0)
 	OPS("le",		P_KW, LTEQ)
 #endif
 
 	KW ("long",		0, DECL|BASIC|TYP_M,0	,K_LONG, 0)
 
 #if FOR_A
+	OPS("mod",		P_KW, MOD)
+
 	OPS("ne",		P_KW, NOTEQ)
 	KW ("nil",		LEAF, 0, P_KW			,K_NIL, 0)
 	OPS("not",		P_KW, NOT)
@@ -572,8 +569,13 @@
 	KW ("__FTENTOX__",	RLOP, 0, F_KW		,TENTOX, 0)
 	KW ("__FTWOTOX__",	RLOP, 0, F_KW		,TWOTOX, 0)
 #endif
-
+#if BOFFS
+	KW ("__OFFS__",		0,    0, 0			,K_OFFS, 0)	/* 08'19 */
+#endif
 	KW ("__OP__",		0, DECL|CODE|OPAT, 0,K_OP, 0)
+#if BOFFS
+	KW ("__O__",		LEAF, 0, 0			,K_O,    0)	/* 09'19 */
+#endif
 #if ! FOR_A
 #if ROTOP
 	OPS ("__ROL__", 0, ROL)
@@ -596,8 +598,6 @@
 	OP ("__getsetsr__",	UNOP|S_EF, 0, 0	,GETSETSR, 0)	/* 03'09 */
 	KW ("__ldsr__",		UNOP|S_EF, 0, 0	,GETSR, 0)		/* sr->ea 03'09 */
 	KW ("__nop__",		LEAF, 0, 0				,K_NOP, 0)		/* 03'09 */
-	KW ("__offsetof__",	0,    0, 0				,K_OFFSET, 0)	/* 03'09 */
-	KWS("__o__",		0,	K_OFFSET)	/* 11' 13 */
 	KW ("__rest__",		LEAF, 0, 0				,K_REST, 0)		/* 03'09 */
 	KW ("__save__",		LEAF, 0, 0				,K_SAVE, 0)		/* 03'09 */
 	OP ("__stop__",		UNOP|S_EF, 0, 0	,HALT, 0)		/* 03'09 */
@@ -705,9 +705,9 @@
 	DTOK (EXPCNV)			/* explicit (casts) */
 	DTOK (ARGCNV)			/* for pushing */
 
-	DTOK (TSIZEOF)
-	DTOK (TOFFSET)
-	DTOK (MEMBER)
+	DTOK (TSIZE)
+	DTOK (TOFFS)
+
 	DTOK (POSTINCR)
 	DTOK (POSTDECR)
 	DTOK (ARG)				/* COMMA in argument list */

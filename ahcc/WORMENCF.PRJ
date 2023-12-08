@@ -6,7 +6,7 @@ wormen\wormencf.prg
 ahcstart.o
 wormen\worms.c
 common\scr_inst.c
-common\aaaankcc.s
+common\xa_nkcc.s
 common\aaaa_lib.c
 ;common\ahcm.o
 

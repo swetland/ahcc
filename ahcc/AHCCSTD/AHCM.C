@@ -266,7 +266,7 @@ XA_unit *split(XA_list *list, long s, bool large)
 		new->size = l;
 		cur->size = s;
 		new->key = -1;
-		new->ty  = -1;
+		new->type  = -1;
 
 		list->cur = new;		/* last split off becomes cur. */
 	}
@@ -501,8 +501,8 @@ void *XA_alloc(XA_memory *base, size_t size, XA_run_out *ranout, XA_key key, XA_
 #else
 		inslast(&blk->used, this);
 #endif
-		this->key = key;
-		this->ty = ty;
+		this->key  = key;
+		this->type = ty;
 
 #if TESTSHRINK
 		if (large)
@@ -643,7 +643,7 @@ void *XA_realloc(XA_memory *base, void *area, size_t size, XA_run_out *ranout, X
 			}
 #endif
 			this->key = key;
-			this->ty = ty;
+			this->type = ty;
 			return this->area;
 		}
 		else
@@ -686,7 +686,7 @@ void *XA_realloc(XA_memory *base, void *area, size_t size, XA_run_out *ranout, X
 
 					blk->free.cur = followup;
 					this->key = key;
-					this->ty = ty;
+					this->type = ty;
 					return this->area;
 				}
 			}
@@ -733,7 +733,7 @@ bool XA_match(XA_unit *at, XA_key key, XA_key ty)
 	bool m =(   key  eq -1
 	         or key  eq at->key )
 	    and (   ty eq -1
-	         or ty eq at->ty )
+	         or ty eq at->type )
 		;
 	return m;
 }
@@ -809,7 +809,7 @@ void XA_down(XA_memory *base)
 		{
 			XA_unit *ax = at->next;
 
-			if (at->ty >= base->stack)
+			if (at->type >= base->stack)
 				free_unit(base, blk, at);
 			at = ax;
 		}

@@ -49,10 +49,9 @@ typedef struct
 	char	tos[6];
 	char	c  [6];
 	char	a  [6];
-	char	h  [6];
-	char	d  [6];
 	char	s  [6];
 	char	o  [6];
+	char	ovl[6];
 	char	l  [6];
 	char	lib[6];
 	char    prj[6];
@@ -65,12 +64,12 @@ typedef struct
 
 typedef enum
 {
-	FTC,FTA,FTH,FTD,FTS,FTO,FTL
+	FTC,FTA,FTS,FTO,FTJ		/* 10'19 HR: v6 project nesting: FTJ */
 } FTY;
 
 typedef struct fcsol
 {
-	S_path f;
+	S_path f, nest;
 	FTY csol;
 	struct fcsol *next;
 } FCSOADL;
@@ -83,9 +82,9 @@ typedef struct
 
 typedef struct
 {
-	FN in,    		/* .c .s .o .l .a files */
+	FN in,    		/* .c .s .o .l .a .prj files */
 	   h;			/* .h .i files */
-	S_path	up, op;		/* start up, executable */
+	S_path op;		/* resulting output */
 } SH_FTABS;
 
 #define ALLC TRUE
@@ -97,13 +96,14 @@ extern SH_SUFS sufs;
 typedef struct project
 {
 	struct project *next, *prior, *parent, *first, *last;
-
+	
 	S_path fn, pad;
 	char *makeCoptions,
 	     *makeSoptions,
 	     *makeLoptions;
 
 	bool makeLib;
+	short depth;
 
 	SH_FTABS files;
 
@@ -115,13 +115,12 @@ DOSTIME tostime			(void);
 void	mklower			(char *s);
 bool	inlist			(FN *t, S_path *f, short ty);
 short 	putlist			(char *t[],short *tc,char *f);
-short 	findupsuf		(char *f,char *s);
+bool 	is_suf			(char *f,char *s);
 bool 	isfile			(char *f);
 void 	myexit			(short);
 S_path 	defofile		(PRJ *prj, S_path *output);
 void	remove_project	(void);
 void	printlists		(FILE *fp, PRJ *prj, char *pad);
-short 	keepfile		(PRJ *prj, S_path *f, short level);
 void *	mmalloc			(long l, char *op1, char *op2, short key);
 BIP		compiler,
         linker;

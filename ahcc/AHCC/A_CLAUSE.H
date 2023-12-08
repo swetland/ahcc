@@ -46,13 +46,13 @@ global
 bool closed_clause(VP flow)
 {
 	LOOP_CONTROL lc = {0};
-	
+
 	if (cur->cat0 & LP_ST)
 	{
 		lc.any = true;
-		lc.loop_back     = new_albl(20);
-		lc.loop_break    = new_albl(21);
-		lc.loop_continue = new_albl(22);
+		lc.loop_back     = new_lbl();
+		lc.loop_break    = new_lbl();
+		lc.loop_continue = new_lbl();
 		new_scope(K_FOR, "loop");
 		lc.have_scope = true;
 

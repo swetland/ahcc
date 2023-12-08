@@ -24,7 +24,6 @@
 
 #include <string.h>
 
-
 #include "mallocs.h"
 #include "aaaa_lib.h"
 #include "hierarch.h"
@@ -38,7 +37,7 @@
 #include "wdial.h"
 #endif
 
-#if GEMSHELL || TEXTFILE || BINARY
+#if GEMSHELL || TEXTFILE || BINED
 #include "kit.h"
 #endif
 
@@ -75,7 +74,7 @@ CONFIG cfg =
 		{false,0,1,2},		/* scroll info's */
 		{true, 1,2,3}
 	},
-	"",		/*check*/
+	"",		/* check */
 	{
 		1, 			/* word */
 		0,			/* any */
@@ -99,6 +98,7 @@ CONFIG cfg =
 	true, true, true,				/* sizer -- hslider */
 	79, 0, 8,
 #endif
+	false,			/* Use clipboard */
 	true			/* autosave: always there, so at the end for comma's above */
 };
 
@@ -328,41 +328,6 @@ void listsets(OpEntry tab[])
 	}
 }
 #endif
-
-global
-void changeconfig(OpEntry *tab, void *old, void *new)
-{
-	while(tab->s.str[0])
-	{
-		if (    tab->a
-		    and tab->s.str[0] ne '{'
-		    and tab->s.o.srt  ne '{')
-		{
-			(long)tab->a -= (long)old;
-			(long)tab->a += (long)new;
-		}
-		tab++;
-	}
-}
-
-global
-OpEntry *copyconfig(OpEntry *tab, void *old, void *new)
-{
-	short l = 1;
-	OpEntry *newtab, *this = tab;
-
-	while(this->s.str[0]) l++, this++;		/* count entries */
-
-	l *= sizeof(OpEntry);
-	newtab = mmalloc(l, "while opening", "not opened", AH_COPYCONFIG);
-	if (newtab)
-	{
-		memcpy(newtab, tab, l);
-		changeconfig(newtab, old, new);
-	}
-
-	return newtab;
-}
 
 global
 char *cfgname(void)	/* ex project file */

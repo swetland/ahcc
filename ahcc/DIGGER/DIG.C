@@ -356,14 +356,14 @@ static WINIT objt_winit
 	elif (cfg.width*deskw.unit.w+w->v.x+w->v.w > wwa.w)
 		w->in.w = wwa.w;
 	else
-		w->in.w = cfg.width*deskw.unit.w+w->v.w-w->v.x+w->mgw.x;
+		w->in.w = cfg.width*deskw.unit.w+w->v.w-w->v.x+w->mg.w;
 
 	if (cfg.height <= 0)
 		w->in.h = wwa.h;
 	elif (cfg.height*deskw.unit.h+w->v.y+w->v.h > wwa.h)
 		w->in.h = wwa.h;
 	else
-		w->in.h	= cfg.height*deskw.unit.h+w->v.h-w->v.y+w->mgw.y;
+		w->in.h	= cfg.height*deskw.unit.h+w->v.h-w->v.y+w->mg.h;
 
 	snapwindow(w, &w->in);	/* !!! gebruikt slechts w->v !!! */
 								/* mooi he? */
@@ -1485,7 +1485,7 @@ MENU_DO do_wdmenu
 		case DMEXTRA:
 			if (w->dis.debug)
 			{
-			
+
 				w->cf.spg = w->dis.pclim;
 				opt(w, DMF2, true);		/* hex/ascii */
 			}
@@ -1600,7 +1600,7 @@ MENU_DO do_wdmenu
 			IT *get_second(IT *, WSELECT *),
 			   *w1 = w,
 			   *w2 = get_second(w1, is_object);
-			   
+
 			if (!w2)
 				send_msg("^2 needs 2 open files\n");
 			else
@@ -2210,8 +2210,6 @@ IT *make_w(char *fn, short fl, D_CFG *q)
 	if (cfg.sizer)
 		wkind |= SIZER|FULLER|MOVER;
 
-/*	textmargin.x = deskw.unit.w/2;
-*/
 	if	( (w = create_IT
 				(	true, /* incl WIND_CREATE */
 					fn,
@@ -2262,10 +2260,11 @@ IT *make_w(char *fn, short fl, D_CFG *q)
 					nil,
 					nil,
 					deskw.unit,
+					-1,		/* 06'20 HR v6 */
 					deskw.points,
+					MINMARGIN,
 					nil
-/*					,textmargin
- */                  )
+                  )
 
 		  ) eq nil
 		)
@@ -2300,8 +2299,8 @@ IT *make_w(char *fn, short fl, D_CFG *q)
 			w->dis.key_remember.i = -1;	/* invalidate ^R (next reference) */
 			w->norm.sz.w = 0;
 			w->view.sz.h = 0;
-			w->hl = v_hl;
-			w->frem.x = w->in.x;		/* breedte fulled = als initieel */
+/*			w->hl = virt_handle;
+*/			w->frem.x = w->in.x;		/* breedte fulled = als initieel */
 			w->frem.w = w->in.w;
 			w->base = nil;
 			w->old = nil;

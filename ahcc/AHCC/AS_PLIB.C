@@ -45,30 +45,30 @@
 #define debug_a G.yflags['a'-'a']
 #define debugA G.xflags['a'-'a']
 
-short alert_text (char *t, ... );
+short missing(short);
+short out_of_range(short);
 
 global
 char *ordinal[] =
 {
-	"size ",
-	"first ",
-	"second ",
-	"third ",
-	"fourth ",
-	"fifth ",
-	"sixth ",
-	"seventh ",
-	"eighth ",
+	"size",
+	"first",
+	"second",
+	"third",
+	"fourth",
+	"fifth",
+	"sixth",
+	"seventh",
+	"eighth",
 	"",				/* unspecified */
-	0
 };
 
 global
-short opnd_err(short n, short which, Cstr msg)
+short opnd_err(short n, Cstr msg)
 {
 	if (n < 0 or n > 9)
 		n = 9;			/* we really need enumerating array initializations */
-	error("[%d]invalid %soperand: %s", which, ordinal[n], msg);
+	error("invalid %s operand: %s", ordinal[n], msg);
 
 	return 1;
 }
@@ -237,12 +237,12 @@ bool check_imm(long l, short sz, short n)
 		case DOT_B:
 			check &= 0xffffff00;
 			if (check ne 0 and check ne 0xffffff00)
-				return opnd_err(n, 2, "out of range"), false;
+				return out_of_range(n), false;
 		break;
 		case DOT_W:
 			check &= 0xffff0000;
 			if (check ne 0 and check ne 0xffff0000)
-				return opnd_err(n, 3, "out of range"), false;
+				return out_of_range(n), false;
 		break;
 	}
 
@@ -263,7 +263,7 @@ void chk_glob(OPND *a, void * e1)
 static
 bool asm_select(OPND *a, NP e1, OPMODE am)
 {
-	if (e1->token eq ASM_SELECT)		/* strunion @ member */
+	if (e1->token eq ASM_SELECTOR)		/* strunion @ member */
 	{
 		if (e1->left->sc eq K_TYPE)		/* declarer @ member (offsetof) */
 		{
@@ -337,10 +337,7 @@ short name_xpr(OPND *a, NP e1, short am)  /* id, n or id+n */
 	      and e1->left ->token eq ID
 	      and e1->right->token eq ID
 	     )
-	{
-/*		message(0, 0, "ID-ID");
-*/		return 7;
-	}
+		return 7;
 	elif (e1->token eq ID)
 	{
 		a->astr = e1->name;
@@ -383,16 +380,16 @@ bool immediate(OPND *a, bool cons, short n)
 	{
 		short err = name_xpr(a, e1, IMM);
 		if (err)
-			opnd_err(n, 4, not_id);
+			opnd_err(n, not_id);
 		if (    cons
 		    and !m_no_absw(a->am, IMM)
 		   )
-			err = opnd_err(n, 5, "needs constant immediate");
+			err = opnd_err(n, "needs constant immediate");
 
 		freenode(e1);
 	}
 	else
-		err = opnd_err(n, 6, "missing");
+		err = missing(n);
 
 	return err eq 0;
 }
@@ -581,12 +578,12 @@ NP opt_scale(OPND *a, NP xp, short n)
 	{
 		short scale = xp->right->val.i;
 		if ((G.CPU & (_H|_CF)) eq 0 and scale > 1)		/* if scale > 1, cpu id must be high or Coldfire */
-			opnd_err(n, 7, "scale factor not allowed");
+			opnd_err(n, "scale factor not allowed");
 		else
 		{
 			xp = xp->left;
 			if (scale ne 1 and scale ne 2 and scale ne 4 and scale ne 8)
-				opnd_err(n, 8, "scale factor must be 2, 4, or 8");
+				opnd_err(n, "scale factor must be 2, 4, or 8");
 			else
 				a->scale = scale eq 2 ? 1 : scale eq 4 ? 2 : 3;
 		}
@@ -605,7 +602,7 @@ short make_opnd(short n, OPND *a, NP bd, NP An, NP Xn, short m1, short m2)
 	{
 		err = name_xpr(a, bd, m2);
 		if (err)
-			opnd_err(n, 9, not_id);
+			opnd_err(n, not_id);
 #if AMFIELDS
 		a->am.f.bdisp = 1;
 #else
@@ -622,7 +619,7 @@ short make_opnd(short n, OPND *a, NP bd, NP An, NP Xn, short m1, short m2)
 		else
 		{
 			if (Xn)
-				err = opnd_err(n, 10, "too many registers"); 			/* syntax error */
+				err = opnd_err(n, "too many registers"); 			/* syntax error */
 			Xn = An;
 			An = nil;
 		}
@@ -657,7 +654,7 @@ short make_opnd(short n, OPND *a, NP bd, NP An, NP Xn, short m1, short m2)
 			}
 		}
 		else
-			err = opnd_err(n, 11, "invalid index register");
+			err = opnd_err(n, "invalid index register");
 	}
 
 #if AMFIELDS
@@ -735,9 +732,14 @@ short make_opnd(short n, OPND *a, NP bd, NP An, NP Xn, short m1, short m2)
 
 The other (normal) addressing modes are quite uncomplicated
 */
-
+static
+short cpu_n_avail(short n)
+{
+	return opnd_err(n, "addressing mode not available on current cpu type");
+}
+/*
 char *cpu_n_avail = "addressing mode not available on current cpu type";
-
+*/
 static
 bool can_REGINDISP(NP lp, NP rp)
 {
@@ -757,7 +759,7 @@ bool can_REGIDX(NP lp, NP rp)
 static
 bool operr1018(short n, short *err)
 {
-	if ((G.CPU & _H) eq 0) { *err = opnd_err(n, 12, cpu_n_avail); return true; }
+	if ((G.CPU & _H) eq 0) { *err = cpu_n_avail(n); return true; }
 	return false;
 }
 
@@ -840,7 +842,7 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 					lp = e1->left, rp = e1->right;
 					if (e1->token eq REGINDIM)		/* memory indirect ([...]) */
 					{
-						if ((G.CPU & _H) eq 0) { err = opnd_err(n, 13, cpu_n_avail); break; }
+						if ((G.CPU & _H) eq 0) { err = cpu_n_avail(n); break; }
 						a->areg = -1, a->ireg = -1;
 #if AMFIELDS
 						a->am.f.mind = 1;
@@ -861,7 +863,7 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 								MO(a->am) = REGI;
 								a->areg = p_areg(lp);
 							othw
-								if ((G.CPU & _H) eq 0) { err = opnd_err(n, 14, cpu_n_avail); break; }
+								if ((G.CPU & _H) eq 0) { err = cpu_n_avail(n); break; }
 
 								MO(a->am) = REGIDXX;
 								a->areg = -1;
@@ -894,14 +896,14 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 			case E_BINARY:					/* simple asm expression: number, name or name+number */
 				err = name_xpr(a, e1, ABS);
 				if (err)
-					opnd_err(n, 15, not_id);
+					opnd_err(n, not_id);
 			break;
 			case E_SPEC:					/* complex: extended addressing modes */
 				lp = e1->left, rp = e1->right;
 				if (e1->token eq REGINDISP)
 				{
 					err = name_xpr(a, lp, 0);
-					if (err) { opnd_err(n, 16, not_id); break; }
+					if (err) { opnd_err(n, not_id); break; }
 
 					if (rp->tt eq E_LEAF)			/* base register only */
 					{
@@ -910,7 +912,7 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 						if (err eq 0)
 						{
 							err = base_reg(a, rp);
-							if (err) { opnd_err(n, 17, "invalid base register"); break; }
+							if (err) { opnd_err(n, "invalid base register"); break; }
 						}
 					}
 					elif (rp->token eq COMMA)		/* both base & index register */
@@ -971,7 +973,7 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 							mem_ind(a, cp->left, &bd, &An, &Xn);
 
 							if (Xn)
-								err = opnd_err(n, 18, "too many registers");
+								err = opnd_err(n, "too many registers");
 
 #if AMFIELDS
 							a->am.f.inc = 1;
@@ -1015,7 +1017,7 @@ static short ea_to_a(OPND *a, NP e1, short type, short n)
 					{
 						err = name_xpr(a->outd, oud, ABS);
 						if (err)
-							opnd_err(n, 19, "invalid outer displacement");
+							opnd_err(n, "invalid outer displacement");
 						else
 #if AMFIELDS
 							a->am.f.odisp = 1;
@@ -1053,12 +1055,9 @@ OPND * p_ea(OPND *a, short type, short n)
 #else
 		if ((a->am&SYMB) and (a->am&ABSW))
 #endif
-		{
-/*			console("am: 0x%04x\n",a->am);
-*/			opnd_err(n, 20, "symbol.w not allowed");
-		}
+			opnd_err(n, "symbol.w not allowed");
 	if (MM(a->am) eq NONE)
-		opnd_err(n, 21, "syntax");
+		opnd_err(n, "syntax");
 	elif (err eq 0)
 		if (check_ea(a, type))
 			return a;

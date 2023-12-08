@@ -4,6 +4,7 @@
 shell\ahccst_t.ttp
 
 .C [-Id:\cc\sinclude]
+.C [-DCVERSION="6"]
 
 ; configuration
 .C [-DBIP_CC=0 -DBIP_ASM=1 -DBIP_LD=0]
@@ -15,13 +16,11 @@ shell\ahccst_t.ttp
 .C [-DROTOP=0]			; <> >< (rol,ror) ROTate OPerators, else __ROL__ and __ROR__
 
 ; debugging
-.C [-DCC_LEAK=1]		; report memory leaks (ahcm)
 .C [-DLOST_NODES=0]
 .C [-DOPTBUG=0 -DPCNT_SAMPLE=0]
 .C [-DC_DEBUG=0]
 .C [-DDBGREG=0]			; analyse local variables for registerizing
 .C [-DDBGBR=0]			; analyse branch optimization
-.C [-DWAIT=0]			; wait after error, warning, message or console
 .C [-DPRLN=0]			; #pragma prln (a option because it calls print_node)
 .C [-DDBGFR=0]			; Debug freeing free nodes (ptrs & const's)
 .C [-DDBGLN=0]			; Signal lost nodes
@@ -33,7 +32,7 @@ shell\ahccst_t.ttp
 .C [-W-par -W-stv -W-sig -W-cln]	; warning level must be 2 !!
 .L [-S=32768]
 =
-pcvstart.o
+ahcstart.o
 
 ; compiler
 ahcc\init_cc.c			; initialize variables
@@ -56,7 +55,6 @@ ahcc\g2.c			(ahcc\code.h)
 ahcc\gsub.c
 ahcc\md.c
 ahcc\nodes.c
-ahcc\cmpl.s
 ahcc\out.c
 
 ; ahcc\ll.s
@@ -88,15 +86,14 @@ ahcc\diagpr.c
 ahcc\list.c													; Generic list routines
 
 common\hierarch.c	; hierarchic name manipulation
+common\aaaa_lib.c	; diversen
 common\dict.c		; dictionary
+common\cmpl.s
 
 pc881lib.lib
 
 common\qmem.c			; quick permanent malloc's
 common\amem.c			; specials
-common\ahcm.c			; non fragmenting and thread save memory allocator
-common\aaaa_lib.c		; for get_cookie() & pluralis()
 
-pcstdlib.lib			; standard library
-pctoslib.lib			; TOS library
-pcextlib.lib			; PC specific
+ahccstdi.lib
+ahccgem.lib

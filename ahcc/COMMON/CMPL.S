@@ -18,7 +18,7 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 *
 
-*	int cmpl(const uchar *s1, const uchar *2, int l);
+*	int cmpl(const uchar *s1, const uchar *s2, int l);
 *								              l at least 1
 *	-1     s1 < s2
 *   +1     s1 > s2

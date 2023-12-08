@@ -34,7 +34,8 @@ static
 short pull,title,			/* for menu_loop with find_pull & find_title */
       mbox_types[]={G_BOX,-1};
 
-externshort aes_flags;
+extern
+short aes_flags;
 
 static
 bool menu_type(short ty, short types[])
@@ -67,19 +68,23 @@ void menu_print(OBJECT *m, short types[])
 }
 
 global
-void menu_init(M_S *ms, short item, short handle, RECT desk)
+void menu_init(M_S *ms, short item)
 {
 	rsrc_gaddr(0,item,&ms->m);
+
+	ms->vhl=virt_handle;
+	ms->dsk=screct;
+	ms->evm_dir=0;
+	ms->mn=0;
+	ms->pn=0;
+	ms->en=0;
 
 	if (item and (aes_flags&GAI_GSHORTCUT))		/* mainmenu item must be zero */
 	{
 		OBJECT *o = ms->m;
 
-#if 0
-		alert_text("item=%d, desk.w=%d | o(1)=%d, o(2)=%d", item, desk.w, o[0].w, o[1].w);
-#endif
-		o[0].w=desk.w;	/* 05.17 OL v5.6 */
-		o[1].w=desk.w;
+		o[0].w=ms->dsk.w;	/* 05.17 OL v5.6 18'20 v6*/
+		o[1].w=ms->dsk.w;
 
 		do{
 			if ((o->type&0xff) eq G_STRING)
@@ -89,13 +94,6 @@ void menu_init(M_S *ms, short item, short handle, RECT desk)
 			o++;
 		}od
 	}
-
-	ms->hl=handle;
-	ms->dsk=desk;
-	ms->evm_dir=0;
-	ms->mn=0;
-	ms->pn=0;
-	ms->en=0;
 }
 
 global
@@ -137,7 +135,7 @@ short find_pull(M_S *ms)
 static
 void menu_ent(M_S *ms)
 {
-	short hl=ms->hl;
+	short hl=ms->vhl;
 	hidem;
 	vswr_mode(hl,3);		/* XOR */
 	vsf_color(hl,1);		/* black */
@@ -173,6 +171,7 @@ void menu_dis(OBJECT *m, short item, bool enab)
 global
 short menu_title(M_S *ms, bool state)
 {
+
 	short sta=state ? 0 : SELECTED;
 	short rest=ms->m[ms->mn].state;
 	rest &=~SELECTED;
@@ -187,7 +186,7 @@ void menu_clear(M_S *ms)
 	ms->en=0;
 	if (ms->pn)
 	{
-		form_rest(ms->m,ms->pn,ms->hl,ms->d);
+		form_rest(ms->m,ms->pn,ms->vhl,ms->d);
 		ms->pn=0;
 	}
 	if (ms->mn)
@@ -208,14 +207,14 @@ void menu_pull(M_S *ms)
 	{
 		ms->pn=find_pull(ms);
 		menu_title(ms,false);		/* invers */
-		ms->d=form_save(ms->m,ms->pn,ms->hl);		/* is incl draw!!! */
+		ms->d=form_save(ms->m,ms->pn,ms->vhl);		/* is incl draw!!! */
 	}
 }
 
 static
 void menu_push(M_S *ms)
 {
-	form_rest(ms->m,ms->pn,ms->hl,ms->d);
+	form_rest(ms->m,ms->pn,ms->vhl,ms->d);
 	ms->pn=0;
 	ms->en=0;
 	ms->d=nil;
@@ -359,16 +358,16 @@ short menu_evm(M_S *ms, short evmask, short event)
 global
 DRAWM menu_draw		/*	M_S *ms, RECT men, RECT cl	*/
 {
-	short yplush=men.y+men.h-1;
-
 	if (ms->m)
 	{
+		short yplush=men.y+men.h-1;
+
 		menu_place(ms,men);
-		draw_ob(ms->m,1,cl,4);	/* bar only */
+		draw_ob(ms->m,1,cl);	/* bar only */
 		hidem;
-		vsl_color(ms->hl, 1);	/* Someone (not ROM TOS) changed line color to white :-( */
-		line(ms->hl,men.x,        yplush,
-		            men.x+men.w-1,yplush);
+		vsl_color(ms->vhl, 1);	/* Someone (not ROM TOS) changed line color to white :-( */
+		line(ms->vhl,men.x,         yplush,
+		             men.x+men.w-1, yplush);
 		showm;
 	}
 }
@@ -425,6 +424,7 @@ MENU_ACT find_key		/*	M_S ms,short titel,short item	*/
 {
 	OBJECT *m=ms->m;
 	char *s = m[item].spec.free_string;
+
 	if (strstr(s,spec.c))
 	{
 		if (menu_avail(ms,item) and menu_avail(ms,titel))
@@ -504,10 +504,7 @@ M_KEY m_key(short kcode)
 					*s++='1',*s++='0';
 				else
 					*s++=kc-NK_F1+'1';
-
-		}
-		else
-		{
+		othw
 			switch (kc)
 			{
 				case NK_ENTER:
@@ -569,7 +566,8 @@ M_KEY m_key(short kcode)
 /*  short menu_keys(M_S *ms,M_KEY key,short *nmt) */
 global
 MENU_KS menu_keys
-{	mmt = 0;
+{
+	mmt = 0;
 	mmn = 0;
 	if (key.c[0])
 	{

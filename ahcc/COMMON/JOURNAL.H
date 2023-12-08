@@ -31,8 +31,10 @@ void con_end(bool top);
 void send_msg (char *, ...);
 void send_msg_n(char *, ...);	/* does not top the journal */
 void store_msg(char *, ...);	/* just store msg in journal text chain */
-void console(char *text, ...);
-void wcons(char *txt, ...);		/* console + wait */
+void console(Cstr text, ...);
+void wcons  (Cstr text, ...);		/* console + wait */
+void load_scrap(IT *w);
+void dump_scrap(short);		/* for testing */
 
 COPRM do_init_text;
 void open_clicked_file(Cstr fn, short linenr);

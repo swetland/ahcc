@@ -213,7 +213,7 @@ void gen_boolean(NP np, short lbl, short truth)	/* generate boolean expression *
 		}
 		else
 #endif
-			mustty(np, AC_BOOL);
+			mustty(np, AC_BOOL,30);
 
 /* If a boolean expression is incomplete a compare to zero is inserted */
 /* e.g.  'if (a) ...'  is completed to 'if (a != 0) ... */
@@ -558,15 +558,15 @@ bool strasn(NP np, bool fmeaea)
 	if (lisa eq 0 or np->left->val.i ne 0)
 #if COLDFIRE
 		if (G.Coldfire and useloop eq 0)
-			addcode(np, "\tlmx  \tR0\t<A" C(strasn 0f) "\n");
+			addcode(np, "\tlmx \tR0\t<A" C(strasn 0f) "\n");
 		else
 #endif
-			addcode(np, "\tlax  \tR0\t<A" C(strasn 0) "\n");
+			addcode(np, "\tlax \tR0\t<A" C(strasn 0) "\n");
 
 	if (   (risa  eq 0 or np->right->val.i ne 0)
 	    and rissp eq 0
 	   )
-		addcode(np, "\tlax  \tR1\t>A" C(strasn 1) "\n");
+		addcode(np, "\tlax \tR1\t>A" C(strasn 1) "\n");
 
 	if (align)
 	{
@@ -604,16 +604,16 @@ bool strasn(NP np, bool fmeaea)
 				addcode(np, "\tmov.l\t\tR1+,R0+" C(strasn 5) "\n");
 				break;
 			case 3:
-				addcode(np, "\tmov  \t\tR1+,R0+" C(strasn 6) "\n");
+				addcode(np, "\tmov \t\tR1+,R0+" C(strasn 6) "\n");
 			case 1:			/* fall through */
 				addcode(np, "\tmov.b\t\tR1+,R0+" C(strasn 7) "\n");
 				break;
 			case 2:
-				addcode(np, "\tmov  \t\tR1+,R0+" C(strasn 8) "\n");
+				addcode(np, "\tmov \t\tR1+,R0+" C(strasn 8) "\n");
 			}
 
 			if ( !ra and (size & 1))		/* keep stack even ??? */
-				addcode(np, "\tadx  \t*s\t#1" C(strasn 9) "\n");		/* NB pull */
+				addcode(np, "\tadx \t*s\t#1" C(strasn 9) "\n");		/* NB pull */
 		}
 		else
 			switch(size)
@@ -622,12 +622,12 @@ bool strasn(NP np, bool fmeaea)
 				addcode(np, "\tmov.l\t\tR1.,R0." C(strasn 10) "\n");
 				break;
 			case 3:
-				addcode(np, "\tmov  \t\tR1.,R0." C(strasn 11) "\n");
+				addcode(np, "\tmov \t\tR1.,R0." C(strasn 11) "\n");
 			case 1:			/* fall through */
 				addcode(np, "\tmov.b\t\tR1.,R0." C(strasn 12) "\n");
 				break;
 			case 2:
-				addcode(np, "\tmov  \t\tR1.,R0." C(strasn 13) "\n");
+				addcode(np, "\tmov \t\tR1.,R0." C(strasn 13) "\n");
 			}
 	}
 
@@ -689,7 +689,7 @@ void push_4_0(NP np, bool b)
 static
 void push_2_0(NP np, bool b)
 {
-	
+
 	if (b)
 		addcode(np, "\tpsh.w\t\t<A" C(push_2_0 pusher) "\n");
 	else
@@ -763,9 +763,9 @@ long strpush(NP np, short tolbl, bool fpeaea)
 	#endif
 		{
 			/* must hold on to offset of first byte, for recognizing of registerizable variable */
-			if (np->r1 eq -1)
+/*			if (np->r1 eq -1)
 				np->r1 = ralloc(AREG, nil);
-			addcode(np, "\tfpshS\t\tA" C(fpeaea) "\n");
+*/			addcode(np, "\tfpshS\t\tA" C(fpeaea) "\n");
 		}
 	}
 	else
@@ -789,10 +789,10 @@ long strpush(NP np, short tolbl, bool fpeaea)
 			if (isa and np->left->val.i eq 0)
 			{
 				np->r1 = np->left->rno;
-				addcode(np, "\tlax  \tR1\tR1.O" C(strpush pusher reg) "\n");
+				addcode(np, "\tlax \tR1\tR1.O" C(strpush pusher reg) "\n");
 			othw
 				tempr(np, AREG);
-				addcode(np, "\tlax  \tR1\t<A" C(strpush pusher) "\n");
+				addcode(np, "\tlax \tR1\t<A" C(strpush pusher) "\n");
 			}
 		othw
 			isa = is_tempa(np);
@@ -800,10 +800,10 @@ long strpush(NP np, short tolbl, bool fpeaea)
 			if (isa and !offs)
 			{
 				np->r1 = np->rno;
-				addcode(np, "\tlax  \tR1\tR1.O" C(strpush for_push reg) "\n");
+				addcode(np, "\tlax \tR1\tR1.O" C(strpush for_push reg) "\n");
 			othw
 				tempr(np, AREG);
-				addcode(np, "\tlax  \tR1\tA" C(strpush for_push) "\n");
+				addcode(np, "\tlax \tR1\tA" C(strpush for_push) "\n");
 			}
 		}
 
@@ -826,7 +826,7 @@ long strpush(NP np, short tolbl, bool fpeaea)
 		}
 
 		if (size eq 2)		/* size made even */
-			addcode(np, "\tpsh  \t\tR1-\n");
+			addcode(np, "\tpsh \t\tR1-\n");
 	}
 	if (tolbl eq 0)
 	{
@@ -1024,8 +1024,8 @@ void ty_to_e(NP np)
 			np->aln = aln;
 		break;
 		case T_PROC:
-			np->cflgs.f.cdec = tp->cflgs.f.cdec;
-			np->cflgs.f.sysc = tp->cflgs.f.sysc;	/* __syscall__ */
+			c_mods(np, tp);							/* 09'19 HR: v6 correct pascal behaviour */
+			np->xflgs.f.sysc = tp->xflgs.f.sysc;	/* __syscall__ */
 			np->fld.offset = tp->fld.offset;		/* __syscall__ params */
 			np->lbl = tp->lbl;
 		break;
@@ -1080,7 +1080,6 @@ void e_to_g(NP np)
 	np->nt = GENODE;					/* transition */
 	np->r1 = -1;
 	np->r2 = -1;
-
 
 /*	s/w dbl & struct return.
 	Exactly the point between typing and generating for insertion of
@@ -1167,7 +1166,7 @@ void addcode(NP np, Cstr s)
 			G.npcode++;
 #endif
 		othw
-			cp = (VP)np;
+			cp = (VP)(np->type);
 			while (cp->codep)	/* find last of list */
 				cp = cp->codep;
 		}

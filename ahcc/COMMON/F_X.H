@@ -21,7 +21,7 @@
  *		F_x.H
  */
 
-#include <prelude.h>
+#include "prelude.h"
 
 #define has_LEFT 1
 #define need_LEFT 0
@@ -30,31 +30,37 @@ typedef double Tmode;
 
 enum
 {
-	PRIMARY=-1,		/* priorities */
+/* priorities */
+	PRIMARY=-1,
 	UNARY,
 	BINARY,
-	RPAR=100,		/* terminators */
+/* terminators */
+	RPAR=100,
 	EOLN=-100,
-	BAD=-1,			/* primaries */
+/* primaries */
+	BAD=-1,
 	NAKS,
 	NUM,
 	IDE,
 #if SHEET
-	LHELM,			/* bip helmholtz giving length */
+	LHELM,			/* bip helmholtz giving pipe length */
 	FHELM,			/*  "      "        "   Fb	   */
 #endif
 	LPAR,
-	VX,				/* 10'17 HR: x variable, to be set ouside in varx */
-	VY,				/* 10'17 HR: y variable, to be set ouside in vary */
-
+	VX,				/* 10'17 HR: x variable, to be set outside in varx */
+	VY,				/* 10'17 HR: y variable, to be set outside in vary */
+#if ! SHEET
+	VZ,				/* 05'18 HR: z variable, aka accumulator */
 	/* The above names cannot be changed without recompilation
 		of the parser (F_x.c) itself.
 		The following names are used in the table only (parsetab.c) and can be changed
 		in any way as long as you change parsetab.c accordingly,
 		well keeping the whole thing consistent.
 	*/
-
-	SQRT,			/* unaries  */
+#endif
+/* unaries  */
+	SQRT,			/* Square root */
+	CURT,			/* Cubic  root */
 	SQR,
 	ABS,
 	RABS,
@@ -76,9 +82,10 @@ enum
 	INT,
 	TORAD,
 	TODEG,
+#if SHEET
 	DEREF,
-
-	LESS,			/* binaries	*/
+/* binaries	*/
+	LESS,
 	LTEQ,
 	GREAT,
 	GTEQ,
@@ -88,13 +95,20 @@ enum
 	AND,
 	QUEST,
 	ELSE,
+	MAXIM,
+	MINIM,
+#endif
 	PLUS,			/* PLUS & MIN can also be unary	*/
 	MIN,
 	TIM,
 	DIV,
 	POW,
-	MAX,
-	RANGE
+#if SHEET
+	COUNT,
+	AVRG,
+	RANGE,
+#endif
+	LAATSTE
 };
 
 typedef struct
@@ -118,7 +132,6 @@ typedef struct
 typedef Token PARSE_NEXT(void);
 
 #define BADSTR {BAD,PRIMARY-10,"  bad_tok  ",HUGE_VAL}
-#define TRACE(a) alert_text("-= " #a " =-");
 
 Token F_x(double x, double y, char *s);
 

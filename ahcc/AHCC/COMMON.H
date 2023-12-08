@@ -25,7 +25,7 @@
 
 typedef struct
 {
-	bool noregs, new_peep;
+	bool noregs, nopeep;	/* reg and peep rely on each other and can not seperately be disabled */
 } PRAGMATS;
 
 typedef struct common
@@ -37,43 +37,27 @@ typedef struct common
 		i2_68040,
 		i2_68060,
 		use_FPU,
+
 		Coldfire,
 		prelude,
-		a_strict_ANSI,
-		b_output_DRI,
-		c_nested_comments;
+
+		c_nested_comments,
+		h_cdecl_calling,
+		k_char_is_unsigned,
+		x_add_underline;
 	short
 		e_max_errors,
 		f_max_warnings,
-		l_identifier_max_length;
-
-	bool
-		g_optimum_size,
-		h_cdecl_calling,
-		j_no_jump_optimization,
-		k_char_is_unsigned,
-		m_string_merging,
-		n_nmlist,
-		p_absolute_calls,
-		q_pascal_calling,
-		s_frame_pointer,
-		t_stack_checking;
-	short
+		l_identifier_max_length,
 		v_Cverbosity;
-	bool
-		x_add_underline,
-		y_debugging,
-		z_register_reload;
 /* end of Pure C compatible options */
 
 /* AHCC specific options */
-#if BIP_ASM || FOR_A
 	TP 	last_decl;
 	short
 		lang,
 	    xlang,
 		asm_if;			/* 04'12 HR: allow single = for 'equals' */
-#endif
 	bool
 		ab_no_branch_reversals,
 		ac_cache_headers,
@@ -86,9 +70,8 @@ typedef struct common
 		aj_auto_depend,
 		au_supervisor,
 		an_no_O,
-		ar_no_registerization,
 		at_Tony,
-		ad_new_peep,
+		ad_nopeep,
 		aw_Xnl,
 /* end of AHCC specific options */
 
@@ -98,6 +81,7 @@ typedef struct common
 		incbin,			/* incbin (include binary file in asm) */
 		in_def,
 		skip_id,
+		in_offs,
 		eof,
 		first_declare;
 
@@ -105,7 +89,9 @@ typedef struct common
 		yflags[26],		/* lower case debug flags */
 		xflags[26],		/* upper case debug flags */
 		anydebug,
-		nmerrors, egiven,nmwarns, wgiven, nmmessages,
+		nmerrors, egiven,
+		nmwarns,  wgiven,
+		nmmessages,
 		npred,
 		idir_n,
 		idir_put,

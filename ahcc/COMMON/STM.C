@@ -26,7 +26,7 @@
 
 #include "mallocs.h"
 #include "ahcm.h"
-#include "wi_types.h"			/* VOOR ahcc_stm & windows.h */
+#include "aaaa_win.h"			/* VOOR ahcc_stm & windows.h */
 #include "stm.h"
 #include "windows.h"
 
@@ -102,10 +102,6 @@ STBASE *stminit(STMDEF *d,STBASE *freebase,STMFMODE cyclic,STMNR usersize,STMNR 
 		return freebase;
 	}
 }
-
-#if DBGCRSH
-#include "stmjinit.h"
-#endif
 
 /* Allocate a chain of c_s free cells */
 static
@@ -275,7 +271,7 @@ STMNR  stmrenum(STMDEF *d,STMNR *num)		/* does NOT affect currencies */
 		{
 			i++;
 			cu->xn=i;
-			t+=cu->xl;
+			t+=cu->x_l;
 		}
 		while ( (cu=cu->nx) ne f);	/* fast */
 	}
@@ -395,9 +391,6 @@ STMC *stmfilast(STMDEF *d)
 	nxpr(b,cu);
 	return cu;
 }
-
-short alert_text(char *t, ... )
-;
 
 global
 STMC *stmfinext(STMDEF *d)			/* SERIAL */

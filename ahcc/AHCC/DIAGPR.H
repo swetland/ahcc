@@ -24,7 +24,7 @@
 
 VpV		printtoks;
 void	printnode(void *vp, bool wait);
-void	print_node(void *vp, char * t, bool wait, bool dbgT);	/* No debugN */
+void	print_node(void *vp, char * t, bool wait, bool dbgT, bool short_t);
 VpT		printlist;
 VpN		pm_print,
 		frcprnode;
@@ -46,3 +46,10 @@ Cstr	preg		(short r),	/* diagnostic */
 		pty			(short sty);
 
 Cstr	sss			(Cstr);
+
+extern
+FILE *B;
+
+void OB(void);
+void CB(void);
+void WB(Cstr txt);

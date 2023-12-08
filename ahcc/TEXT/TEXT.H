@@ -28,6 +28,8 @@ extern bool abandon_ins;
 #define high(s) (s ? s->xun : HIGH_VAL)
 #define APRCT 66
 
+int strtcmp(int a, const char *s1, const char *s2);
+
 STMC *	ins_text		(STMACC acc,IT *w,char *text, ...);
 void	clearmal		(STMDEF *d);
 STMC *	find_line		(IT *w,long zoek);
@@ -62,4 +64,3 @@ IT *	editor_window	(bool cre, Cstr name, char *info,
 						WINIT winit                 );
 void	txt_margin		(IT *w,STMC *s,short y);
 char *	condense		(IT *w, long *mapl, void *base);
-void	f_txt			(short,short,short,char *);		/* aligned text */

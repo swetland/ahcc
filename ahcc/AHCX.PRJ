@@ -9,13 +9,14 @@ text\ahcx.prg
 .C [-W-par -W-stv -W-sig -W-cln]	; warning level must be 2 !!
 .L [-S=16384]
 =
-pcvstart.o
+ahcstart.o
+
 aaaa.c
 
 text\text.c
-text\cmpl.s
 text\cursor.c
 text\editor.c
+text\buffer.c
 text\text_cfg.c
 text\text_sel.c
 
@@ -27,6 +28,7 @@ common\options.c
 common\windows.c
 common\wdial.c		; window dialogue handling
 common\journal.c
+common\scrap.c		; clipboard handling
 common\msgbuf.c
 common\stm.c			; chain manager
 common\config.c
@@ -38,9 +40,7 @@ common\nkcc_c.c
 common\aaaankcc.s		; for the real nkc_tconv
 common\win_menu.c
 common\aaaa_lib.c
-common\ahcm.c		; non fragmenting and thread save memory allocator
+common\cmpl.s
 
-pcstdlib.lib       ; standard library
-pctoslib.lib       ; TOS library
-pcgemlib.lib       ; AES and VDI library
-pcextlib.lib       ; Pure_c specific
+ahccstdi.lib
+ahccgem.lib

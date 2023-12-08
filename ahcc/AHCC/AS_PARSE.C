@@ -50,6 +50,24 @@ OPND *newop(void);
 short is_mfpcr(short *cr);
 bool  is_fpsr (short *sr);
 
+static
+void must_an(short n)
+{
+	opnd_err(n, "must be (An)");
+}
+
+global
+short missing(short n)
+{
+	return opnd_err(n, "missing");
+}
+
+global
+void out_of_range(short n)
+{
+	opnd_err(n, "out of range");
+}
+
 /* NB!!!! OPMODE must be passed by value */
 global
 bool m_no_absw(OPMODE m, short mo)
@@ -89,11 +107,11 @@ short isize(Cstr allowed, short def)		/* 12'10 HR: allow for .label */
 {
 	short sz = -1;
 	G.dot_seen = false;
-	if (cur->token eq SELECT)
+	if (cur->token eq SELECTOR)
 	{
 		fadvnode();
 		if (cur->token ne ID)
-			opnd_err(0, 1, "no size identifier");
+			opnd_err(0, "no size identifier");
 		else
 		{
 			if   (allowed[0] ne ' ' and stricmp(cur->name, "b") eq 0)
@@ -134,7 +152,7 @@ bool p_colon(short n)
 		fadvnode();
 		return true;
 	othw
-		opnd_err(n, 100, "expects ':'");
+		opnd_err(n, "expects ':'");
 		return false;
 	}
 }
@@ -159,7 +177,7 @@ bool p_comma(short n)
 		fadvnode();
 		return true;
 	othw
-		opnd_err(n, 101,  "missing");
+		missing(n);
 		return false;
 	}
 }
@@ -183,7 +201,7 @@ bool p_Dn(OPND *op, short n)
 	if (MO(op->am) eq REG)
 	if (ISDonly(op->areg))
 		return true;
-	opnd_err(n, 102, "not a data register");
+	opnd_err(n, "not a data register");
 	return false;
 }
 
@@ -194,7 +212,7 @@ bool p_An(OPND *op, short n)
 	if (MO(op->am) eq REG)
 	if (ISAonly(op->areg))
 		return true;
-	opnd_err(n, 103, "not an address register");
+	opnd_err(n, "not an address register");
 	return false;
 }
 
@@ -206,7 +224,7 @@ bool p_Fn(OPND *op, short n)
 	if (MO(op->am) eq REG)
 	if (ISFonly(op->areg))
 		return true;
-	opnd_err(n, 104, "not a floating point register");
+	opnd_err(n, "not a floating point register");
 	return false;
 }
 #endif
@@ -217,7 +235,7 @@ bool p_Xn(OPND *op, short n)
 	if (p_ea(op, 0, n))
 	if (MO(op->am) eq REG)
 		return true;
-	opnd_err(n, 105, "must be register direct");
+	opnd_err(n, "must be register direct");
 	return false;
 }
 
@@ -229,7 +247,7 @@ bool is_srccr(IP ip, OPND *a, bool sr, bool usp, short n)
 	if (stricmp(cur->name, "ccr") eq 0)
 	{
 		if (ip->sz ne DOT_W and ip->sz ne DOT_B)
-			opnd_err(0, 106, "only byte and word size allowed");
+			opnd_err(0, "only byte and word size allowed");
 		else
 			MO(a->am) = CONDREG;
 		a->disp = CCR;
@@ -241,13 +259,13 @@ bool is_srccr(IP ip, OPND *a, bool sr, bool usp, short n)
 		if (G.CPU & _S)
 		{
 			if (ip->sz ne DOT_W)
-				opnd_err(0, 107, "only word size allowed");
+				opnd_err(0, "only word size allowed");
 			else
 				MO(a->am) = CONDREG;
 			a->disp = SR;
 		}
 		else
-			opnd_err(n, 108, "sr is privileged");
+			opnd_err(n, "sr is privileged");
 
 		return true;
 	}
@@ -257,14 +275,14 @@ bool is_srccr(IP ip, OPND *a, bool sr, bool usp, short n)
 		if (G.CPU & _S)
 		{
 			if (ip->sz ne DOT_W and ip->sz ne DOT_L)
-				opnd_err(0, 109, "only word and long allowed");
+				opnd_err(0, "only word and long allowed");
 			else
 				MO(a->am) = CONDREG;
 			ip->sz = DOT_L;
 			a->disp = USP;
 		}
 		else
-			opnd_err(n, 110, "usp is privileged");
+			opnd_err(n, "usp is privileged");
 
 		return true;
 	}
@@ -310,11 +328,17 @@ void p_simmp_ea(IP ip, OPND *arg, OPND *dst, short tok, short A_tok)
 }
 
 static
+void bs_err(void)
+{
+	opnd_err(0, "byte size not allowed");
+}
+
+static
 bool p_ok_An(IP ip, OPND *op)
 {
 	if (MO(op->am) eq REG and ISAA(op))
 		if (ip->sz eq DOT_B)
-			return opnd_err(0, 111, "byte size not allowed"), false;
+			return bs_err(), false;
 	return true;
 }
 
@@ -326,10 +350,8 @@ bool p_may_An(IP ip, OPND *op, short Atok, short *tok)
 		if (Atok and ISAA(op))
 		{
 			if (ip->sz eq DOT_B)
-			{
-				opnd_err(0, 112, "byte size not allowed");
-				return false;
-			}
+				return bs_err(), false;
+
 			*tok = Atok;
 		}
 
@@ -425,7 +447,7 @@ void p_comma_separated(IP ip, short tok, short sc)		/* 7'15 v5.2 */
 
 		if (!rv)
 		{
-			globl_sym(np, 0);
+			globl_sym(np);
 			np->sc = sc;
 
 			np->type = basic_type(T_LONG, 0);
@@ -492,17 +514,6 @@ void p_label(XP ll, long offs, bool loc) /* loc is true, label within 'module' *
 			rv = tlook(symtab[hash(lb->name)],lb);
 	}
 
-#if 0
-	if (rv)
-		if (rv->sc eq K_LOCAL)
-		{
-			if (rv->nflgs.f.Xp eq 0)
-				message(0, 0, "K_LOCAL %s rv %ld outside macro", rv->name, rv->lbl);
-			else
-				message(0, 0, "K_LOCAL %s rv %ld", rv->name, rv->lbl);
-		}
-#endif
-
 	if (rv)
 	{
 		ty = label_scope(rv, gv, rv->sc ne K_LOCAL);
@@ -513,9 +524,9 @@ void p_label(XP ll, long offs, bool loc) /* loc is true, label within 'module' *
 		if (dot)
 			dot_sym(lb);
 		elif (loc)
-			loc_sym(lb, 0);
+			loc_sym(lb);
 		else
-			globl_sym(lb, 0);
+			globl_sym(lb);
 		rv = lb;
 		ty = label_scope(rv, gv, false);
 	}
@@ -559,15 +570,12 @@ void p_local(IP ip, short tok)	/* 7'15 v5.2 */
 
 		if (!rv)
 		{
-/*!!*/		globl_sym(np, 0);
+/*!!*/		globl_sym(np);
 			np->sc = K_LOCAL;
-/*			message(0, 0,"K_LOCAL %d", np->lbl);
-*/
 			np->type = basic_type(T_LONG, 0);
 			to_nct(np);
 		othw
-/*			message(0, 0, "already K_LOCAL %d --> %d", rv->lbl,np->lbl);
-*/			rv->lbl = np->lbl;
+			rv->lbl = np->lbl;
 			freeTn(np);
 		}
 
@@ -589,7 +597,7 @@ void p_addsubq(IP ip, OPND *arg, OPND *dst, short tok)
 			{
 				long l = ip->arg->disp;
 				if (l <= 0 or l > 8)
-					opnd_err(1, 113, "not (0 < n <= 8)");
+					opnd_err(1, "not (0 < n <= 8)");
 				elif (p_ok_An(ip, dst))
 					AS_PARSE_OK;
 			}
@@ -672,7 +680,7 @@ void p_equ(short c)
 			}
 		}
 		else
-			globl_sym(tp, 0);		/* see see_id */
+			globl_sym(tp);		/* see see_id */
 		freenode(val);
 	othw
 		if (equ_ok(val))
@@ -719,7 +727,7 @@ bool p_area(IP ip, OPND *arg)
 			new_scope(K_ASM, ip->arg->astr);
 			return true;
 		}
-	opnd_err(1, 114, "must be a single identifier");
+	opnd_err(1, "must be a single identifier");
 	return false;
 }
 
@@ -769,7 +777,7 @@ p_A P_align
 p_A P_section
 {
 	if (cur->token ne ID)
-		opnd_err(1, 115, "needs ID");
+		opnd_err(1, "needs ID");
 	elif (stricmp(cur->name, "text") eq 0)
 		ip->opcode = A_text;
 	elif (stricmp(cur->name, "data") eq 0)
@@ -777,7 +785,7 @@ p_A P_section
 	elif (stricmp(cur->name, "bss") eq 0)
 		ip->opcode = A_bss;
 	else
-		opnd_err(1, 116, "needs 'text', 'data' or 'bss'");
+		opnd_err(1, "needs 'text', 'data' or 'bss'");
 }
 
 p_A P_module
@@ -845,7 +853,7 @@ p_A P_incbin
 p_A P_cpu
 {
 	if (cur->token ne ICON)
-		opnd_err(1, 117, "must be a number");
+		opnd_err(1, "must be a number");
 	else
 		switch(cur->val.i)
 		{
@@ -859,7 +867,7 @@ p_A P_cpu
 			case 7: G.CPU  = _CF| (G.CPU & (_S|_8)); break;
 			case 8: G.CPU |= _8; break;
 			default:
-				opnd_err(1, 118, "must be (0 <= cpu <= 8)");
+				opnd_err(1, "must be (0 <= cpu <= 8)");
 		}
 }
 
@@ -1005,7 +1013,7 @@ p_A P_dc
 				return;
 			}
 			else
-				opnd_err(9, 119, "out of range");
+				out_of_range(9);
 
 			freenode(e1);
 		}
@@ -1030,9 +1038,9 @@ p_A P_dcb
 			if (e1->token eq COMMA)
 			{
 				if (e1->left->token ne ICON)
-					opnd_err(2, 120, "needs constant expression");
+					opnd_err(2, "needs constant expression");
 				elif (e1->left->val.i <= 0)
-					opnd_err(2, 121, "out of range");
+					out_of_range(2);
 				elif (check_dc(e1->right, ip->sz))
 				{
 					(NP)ip->arg = e1;
@@ -1040,7 +1048,8 @@ p_A P_dcb
 					return;
 				}
 				else
-					opnd_err(9, 122, "out of range");
+					out_of_range(9);
+
 			othw
 				if (check_dc(e1, ip->sz))
 				{
@@ -1049,7 +1058,7 @@ p_A P_dcb
 					return;
 				}
 				else
-					opnd_err(9, 113, "out of range");
+					out_of_range(9);
 			}
 
 			freenode(e1);
@@ -1094,7 +1103,7 @@ p_A P_ascii
 				return;
 			}
 			else
-				opnd_err(1, 124, "needs quoted strings");
+				opnd_err(1, "needs quoted strings");
 
 			freenode(e1);
 		}
@@ -1122,7 +1131,7 @@ bool p_XY(IP ip, OPND *arg, OPND *dst, short tok)
 #else
 			if (arg->am ne (REGI|DEC))
 #endif
-				opnd_err(1, 125, "must be data register or -(An)");
+				opnd_err(1, "must be data register or -(An)");
 			elif (p_comma(2))
 				if (p_ea(dst, 0, 2))
 #if AMFIELDS
@@ -1132,7 +1141,7 @@ bool p_XY(IP ip, OPND *arg, OPND *dst, short tok)
 #else
 					if (dst->am ne (REGI|DEC))
 #endif
-						opnd_err(2, 126, "must be -(An)");
+						opnd_err(2, "must be -(An)");
 					else
 						return true;
 	}
@@ -1294,12 +1303,12 @@ void p_shift(IP ip, OPND *arg, OPND *dst, short tok)
 		if (immediate(arg, IMMCONS, 1))
 			if (p_comma(2))
 				if (arg->disp < 1 or arg->disp > 8)
-					opnd_err(1, 127, "out of range");	/* 11'09 HR operand 1 */
+					out_of_range(1);	/* 11'09 HR operand 1 */
 				elif (p_Dn(dst, 2))
 					ip->reg = dst->areg, AS_PARSE_OK;
 	othw
 		if (ip->sz ne DOT_W)
-			opnd_err(0, 128, "must be word size");
+			opnd_err(0, "must be word size");
 		elif (p_ea(arg, AM_M_ALT, 1))
 			ip->reg = -1, AS_PARSE_OK;
 	}
@@ -1348,7 +1357,7 @@ void p_bit(IP ip, OPND *arg, OPND *dst, short tok, short type)
 		if (p_comma(2))
 			if (p_ea(dst, AM_D_ADD, 2))
 				if (MO(arg->am) ne REG and !m_no_absw(arg->am, IMM))
-					opnd_err(1, 129, "must be Dn or constant immediate");
+					opnd_err(1, "must be Dn or constant immediate");
 				else
 					AS_PARSE_OK;
 }
@@ -1359,12 +1368,18 @@ p_A P_bclr { p_bit(ip, arg, dst, tok, AM_D_ALT); }
 p_A P_bset { p_bit(ip, arg, dst, tok, AM_D_ALT); }
 
 static
+void dc_err(short n)
+{
+	opnd_err(n, "must be Dn or constant");
+}
+
+static
 OPND * p_bfow(void)
 {
 	OPND *offset = newop(), *width = newop();
 
 	if (cur->token ne BLOCK)
-		return opnd_err(2, 131, "missing"), (OPND *)nil;
+		return missing(2), (OPND *)nil;
 	fadvnode();
 	if (p_ea(offset, 0, 2))
 	{
@@ -1372,9 +1387,9 @@ OPND * p_bfow(void)
 		    and !m_no_absw(offset->am, IMM)
 		    and !m_no_absw(offset->am, ABS)
 		   )
-			return opnd_err(2, 132, "must be Dn or constant"), (OPND *)nil;
+			return dc_err(2), (OPND *)nil;
 		if (cur->token ne FIELD)
-			return opnd_err(2, 132, "missing"), (OPND *)nil;
+			return missing(2), (OPND *)nil;
 		else
 		{
 			fadvnode();
@@ -1385,9 +1400,9 @@ OPND * p_bfow(void)
 			    and !m_no_absw(width->am, IMM)
 			    and !m_no_absw(width->am, ABS)
 			   )
-				return opnd_err(2, 133, "must be Dn or constant"), (OPND *)nil;
+				return dc_err(2), (OPND *)nil;
 			if (cur->token ne /* br */ KCOLB)
-				return opnd_err(2, 134, "missing"), (OPND *)nil;
+				return missing(2), (OPND *)nil;
 			fadvnode();
 		}
 		offset->next = width;
@@ -1516,14 +1531,14 @@ p_A P_link
 {
 	ip->sz = isize(wl, DOT_W);
 	if (ip->sz eq DOT_L and (G.CPU & _H) eq 0)
-		opnd_err(0, 135, "long size not allowed with 68000");
+		opnd_err(0, "long size not allowed with 68000");
 	elif (p_An(arg, 1))
 	{
 		ip->reg = arg->areg;
 		if (p_comma(2))
 			if (p_ea(arg, 0, 2))
 				if (!m_no_absw(arg->am, IMM))
-					opnd_err(2, 136, "needs constant immediate");
+					opnd_err(2, "needs constant immediate");
 				else
 					AS_PARSE_OK;
 	}
@@ -1559,7 +1574,7 @@ p_A P_move
 					if (MO(dst->am) eq CONDREG)
 						if (dst->disp eq USP)
 							if (!ISAA(arg))
-								opnd_err(1, 137, "not a address register");
+								opnd_err(1, "not a address register");
 							else
 								AS_PARSE_OK;
 						elif (check_ea(arg, AM_D_ADD))
@@ -1593,7 +1608,7 @@ p_A P_wdebug
 		if (MO(arg->am) eq REGI or MO(arg->am) eq REGID)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 138, "needs (An) or d(An)");
+			opnd_err(1, "needs (An) or d(An)");
 
 }
 
@@ -1682,7 +1697,7 @@ p_A P_move16
  */
 
 static
-void mk_mask(short which, RMASK *msk, short r1, short r2)
+void mk_mask(RMASK *msk, short r1, short r2)
 {
 	if (r1 <= r2)
 		while (r1 <= r2)
@@ -1690,6 +1705,12 @@ void mk_mask(short which, RMASK *msk, short r1, short r2)
 	else
 		while (r2 <= r1)
 			*msk |= RM(r2), r2++;
+}
+
+static
+void rl_err(short n)
+{
+	opnd_err(n, "syntax error in register list");
 }
 
 static
@@ -1707,23 +1728,22 @@ bool X_spec(RMASK *mask, short n)
 			fadvnode();
 			if (p_isdreg(cur))
 			{
-				mk_mask(1, mask, r1,
+				mk_mask(mask, r1,
 				              cur->token - K_D0 + DREG);
 				fadvnode();
 			}
 			elif (p_isareg(cur))
 			{
-				mk_mask(2, mask, r1,
-				              K_D7 - K_D0 + DREG);
-				mk_mask(3, mask, K_A0 - K_A0 + AREG - FREG,
+				mk_mask(mask, r1, K_D7 - K_D0 + DREG);
+				mk_mask(mask, K_A0 - K_A0 + AREG - FREG,
 				              cur->token - K_A0 + AREG - FREG);
 				fadvnode();
 			}
 			else
-				return opnd_err(n, 139, "syntax error in register list"), false;
+				return rl_err(n), false;
 		}
 		else
-			mk_mask(4, mask, r1, r1);			/* 1 reg */
+			mk_mask(mask, r1, r1);			/* 1 reg */
 	}
 	elif (p_isareg(cur))
 	{
@@ -1734,23 +1754,23 @@ bool X_spec(RMASK *mask, short n)
 			fadvnode();
 			if (p_isareg(cur))
 			{
-				mk_mask(5, mask, r1,
+				mk_mask(mask, r1,
 				              cur->token - K_A0 + AREG - FREG);
 				fadvnode();
 			}
 			elif (p_isdreg(cur))
 			{
-				mk_mask(6, mask, r1,
+				mk_mask(mask, r1,
 				              K_A0 - K_A0 + AREG - FREG);
-				mk_mask(7, mask, K_D7 - K_D0 + DREG,
+				mk_mask(mask, K_D7 - K_D0 + DREG,
 				              cur->token - K_D0 + DREG);
 				fadvnode();
 			}
 			else
-				return opnd_err(n, 140, "syntax error in register list"), false;
+				return rl_err(n), false;
 		}
 		else
-			mk_mask(8, mask, r1, r1);			/* 1 reg */
+			mk_mask(mask, r1, r1);			/* 1 reg */
 	}
 
 	return true;
@@ -1762,10 +1782,7 @@ bool reg_list(OPND *op, short n)
 	if (cur->token eq PREP)
 	{
 		if (immediate(op, IMMCONS, n))
-		{
-/*			message(0, 0, "immediate mask");
-*/			return true;
-		}
+			return true;
 	othw
 		RMASK mask = 0;
 		X_spec(&mask, n);
@@ -1781,8 +1798,7 @@ bool reg_list(OPND *op, short n)
 		return true;
 	}
 
-/*	message(0, 0, "no reg list");
-*/	return false;
+	return false;
 }
 
 #if FLOAT
@@ -1805,7 +1821,7 @@ bool F_spec(RMASK *mask, short n)
 				fadvnode();
 			}
 			else
-				return opnd_err(n, 141, "syntax error in register list"), false;
+				return rl_err(n), false;
 		}
 		else
 			r2 = r1;			/* 1 reg */
@@ -2124,7 +2140,7 @@ p_A P_trap
 		if (arg->disp >= 0 and arg->disp <= 16)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 142, "out of range");
+			out_of_range(1);
 }
 
 p_A P_aline
@@ -2152,7 +2168,7 @@ static
 void p_cinvpush(IP ip, OPND *arg, short tok)
 {
 	if (!p_cachereg(ip, cur))
-		opnd_err(1, 143, "needs identifier which is one of NC, DC, IC or BC");
+		opnd_err(1, "needs identifier which is one of NC, DC, IC or BC");
 	elif (arg eq nil)
 		AS_PARSE_OK;
 	elif (p_comma(2))
@@ -2160,7 +2176,7 @@ void p_cinvpush(IP ip, OPND *arg, short tok)
 			if (MO(arg->am) eq REGI)
 				AS_PARSE_OK;
 			else
-				opnd_err(2, 144, "must be (An)");
+				must_an(2);
 }
 
 p_A P_cinvl  { p_cinvpush(ip, arg, tok); }
@@ -2176,7 +2192,7 @@ p_A P_intouch
 		if (MO(arg->am) eq REGI)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 145, "must be (An)");
+				must_an(1);
 }
 
 typedef struct crr
@@ -2331,7 +2347,7 @@ static
 bool p_crr(OPND *op, CRR *y, short n)
 {
 	if (cur->token ne ID)
-		opnd_err(n, 146, "needs identifier");
+		opnd_err(n, "needs identifier");
 	else
 	{
 		Cstr s = cur->name;
@@ -2349,10 +2365,10 @@ bool p_crr(OPND *op, CRR *y, short n)
 				return true;
 			}
 
-			opnd_err(n, 147, "control register not present on current cpu type");
+			opnd_err(n, "control register not present on current cpu type");
 		}
 		else
-			opnd_err(n, 148, "not a control register identifier");
+			opnd_err(n, "not a control register identifier");
 	}
 
 	return false;
@@ -2404,9 +2420,9 @@ bool o_bra(IP ip, OPND *arg, short n)
 	if (p_ea(arg, 0, n))
 	{
 		if (MM(arg->am) ne ABS and MM(arg->am) ne INSTD)	/* 05'11 HR: allow INSTD */
-			opnd_err(n, 149, "not a valid branch destination");
+			opnd_err(n, "not a valid branch destination");
 		elif (ip->sz eq DOT_L and (G.CPU & _H) eq 0)
-			opnd_err(n, 150, "long not allowed on 68000");
+			opnd_err(n, "long not allowed on 68000");
 		elif (check_imm(arg->disp, ip->sz, n))
 			return true;
 	}
@@ -2449,7 +2465,7 @@ p_A P_trapt			/* TRAPcc */
 {
 	ip->sz = isize(wl, DOT_W);
 	if (cur->token ne PREP)
-		opnd_err(1, 151, "needs constant immediate");
+		opnd_err(1, "needs constant immediate");
 	else
 		if (immediate(arg, IMMCONS, 1))
 			AS_PARSE_OK;
@@ -2466,7 +2482,7 @@ p_A P_cmpm
 #else
 		if (arg->am ne (REGI|INC))
 #endif
-			opnd_err(1, 152, "must be (An)+");
+			opnd_err(1, "must be (An)+");
 		elif (p_comma(2))
 			if (p_ea(dst, 0, 2))
 #if AMFIELDS
@@ -2476,7 +2492,7 @@ p_A P_cmpm
 #else
 				if (dst->am ne (REGI|INC))
 #endif
-					opnd_err(2, 153, "must be (An)+");
+					opnd_err(2, "must be (An)+");
 				else
 					AS_PARSE_OK;
 }
@@ -2496,7 +2512,7 @@ p_A P_chk
 {
 	ip->sz = isize(wl, DOT_W);
 	if (ip->sz eq DOT_L and (G.CPU & _H) eq 0)
-		opnd_err(1, 154, "long not allowed on 68000");
+		opnd_err(1, "long not allowed on 68000");
 	elif (p_ea(arg, AM_D_ADD, 1))
 		if (p_comma(2))
 			if (p_Dn(dst, 3))
@@ -2550,14 +2566,14 @@ p_A P_cas2
 	if (p_comma(5))
 	if (p_ea(o3, 0, 5))
 	if (!cas_mode(o3))
-		opnd_err(5, 155, "needs (An) or (Dn)");
+		opnd_err(5, "needs (An) or (Dn)");
 	else
 	if (p_colon(6))
 	if (p_ea(o4, 0, 6))
 	if (cas_mode(o4))
 		AS_PARSE_OK;
 	else
-		opnd_err(6, 156, "needs (An) or (Dn)");
+		opnd_err(6, "needs (An) or (Dn)");
 }
 
 p_A P_bkpt
@@ -2566,7 +2582,7 @@ p_A P_bkpt
 		if (arg->disp >= 0 and arg->disp < 8)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 157, "needs constant immediate 0 <= i < 8");
+			opnd_err(1, "needs constant immediate 0 <= i < 8");
 }
 
 #if FLOAT
@@ -2596,7 +2612,7 @@ p_A P_fmove
 		fadvnode();
 		tok = A_fmovesr;
 		if (ip->sz ne DOT_L)
-			opnd_err(1, 158, "invalid size");
+			opnd_err(1, "invalid size");
 		elif (p_comma(2))
 			if (p_ea(arg, AM_D_ALT, 2))
 				ip->reg = fpsr, AS_PARSE_OK;
@@ -2609,7 +2625,7 @@ p_A P_fmove
 				fadvnode();
 				tok = A_fmovesr;
 				if (ip->sz ne DOT_L)
-					opnd_err(1, 159, "invalid size");
+					opnd_err(1, "invalid size");
 				else
 					dst->areg = fpsr, AS_PARSE_OK;
 			}
@@ -2621,13 +2637,13 @@ static
 void p_fp(IP ip, OPND *arg, short tok, bool move)
 {
 	OPND *dst = arg->next;
-	bool have_sz = cur->token eq SELECT;
+	bool have_sz = cur->token eq SELECTOR;
 
 	ip->sz = isize(forfp, DOT_W);
 
 	if (p_isfreg(cur))
 		if (have_sz and ip->sz ne DOT_X and !move)
-			opnd_err(0, 160, "only none or .x allowed");
+			opnd_err(0, "only none or .x allowed");
 		else
 		{
 			ip->sz = DOT_X;
@@ -2726,7 +2742,7 @@ p_A P_fsincos
 				AS_PARSE_OK;
 			}
 		othw
-			opnd_err(3, 161, "needs 2 destination registers");
+			opnd_err(3, "needs 2 destination registers");
 			ip->opcode = 0;
 		}
 	}
@@ -2736,14 +2752,14 @@ p_A P_fnop { AS_PARSE_OK; }
 
 p_A P_ftst
 {
-	bool have_sz = cur->token eq SELECT;
+	bool have_sz = cur->token eq SELECTOR;
 
 	ip->sz = isize(forfp, DOT_W);
 
 	ip->reg = -1;
 	if (p_isfreg(cur))
 		if (have_sz and ip->sz ne DOT_X)
-			opnd_err(0, 162, "only none or .x allowed");
+			opnd_err(0, "only none or .x allowed");
 		else
 		{
 			ip->sz = DOT_X;
@@ -2761,7 +2777,7 @@ bool o_pfbra(IP ip, OPND *arg, short n)
 {
 	if (p_ea(arg, 0, n))
 		if (MM(arg->am) ne ABS)
-			opnd_err(n, 163, "not a valid branch destination");
+			opnd_err(n, "not a valid branch destination");
 		elif (check_imm(arg->disp, ip->sz, n))
 			return true;
 	return false;
@@ -2783,7 +2799,7 @@ void o_pfdbf(IP ip, OPND *arg, short tok)
 static
 void o_pftrapf(IP ip, OPND *arg, short tok)
 {
-	bool have_sz = cur->token eq SELECT;
+	bool have_sz = cur->token eq SELECTOR;
 
 	ip->sz = isize(bwl, DOT_B);
 	if (!have_sz)
@@ -2814,7 +2830,7 @@ void p_plpa(IP ip, OPND *arg, short tok)
 		if (MO(arg->am) eq REGI)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 164, "must be (An)");
+			opnd_err(1, "must be (An)");
 }
 p_A P_plpar { p_plpa(ip, arg, tok); }
 p_A P_plpaw { p_plpa(ip, arg, tok); }
@@ -2854,7 +2870,7 @@ p_A P_pvalid
 			ip->reg = arg->areg;
 		else
 		{
-			opnd_err(1, 165, "only VAL or An allowed");
+			opnd_err(1, "only VAL or An allowed");
 			return;
 		}
 
@@ -2874,7 +2890,7 @@ void pflush_4(IP ip, OPND *arg, short tok)
 		if (MO(arg->am) eq REGI)
 			AS_PARSE_OK;
 		else
-			opnd_err(1, 166, "must be (An)");
+			must_an(1);
 }
 
 p_A P_pflushn { pflush_4(ip, arg, tok); }
@@ -2909,7 +2925,7 @@ bool p_fc(OPND *a)
 			if (a->disp >= 0 and a->disp <= m)
 				return a->disp |= 020, true;
 
-	opnd_err(1, 167, "no valid function code specification");
+	opnd_err(1, "no valid function code specification");
 	return false;
 }
 
@@ -2921,7 +2937,7 @@ bool p_mask(OPND *a)
 			if (a->disp >= 0 and a->disp <= 7)
 				return true;
 
-	opnd_err(1, 168, "no valid mask specification");
+	opnd_err(1, "no valid mask specification");
 	return false;
 }
 
@@ -2986,7 +3002,7 @@ void p_ptest(IP ip, OPND *arg, OPND *dst, short tok)
 				ip->reg = an->areg, AS_PARSE_OK;
 		}
 		else
-			opnd_err(3, 169, "no valid level specification");
+			opnd_err(3, "no valid level specification");
 	}
 }
 
@@ -2998,9 +3014,9 @@ bool cpu5_ok(OPND *a, short reg, short n)
 {
 	if (MO(a->am) eq REG)
 		if (reg >= DRP and reg <= CRP)
-			return opnd_err(n, 170, "register direct not allowed"), false;
+			return opnd_err(n, "register direct not allowed"), false;
 	if (n eq 1 and reg eq PCSR)
-		return opnd_err(2, 171, "pmove to pcsr not allowed"), false;
+		return opnd_err(2, "pmove to pcsr not allowed"), false;
 	return true;
 }
 

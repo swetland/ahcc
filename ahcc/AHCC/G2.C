@@ -27,14 +27,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <tos.h>
+
 #include "param.h"
+
 #include "code.h"
-
-extern
-short context_flags[];
-
-#define debugG G.xflags['g'-'a']
-
 #include "gen.h"
 #include "d2.h"
 #include "g2.h"
@@ -43,7 +39,48 @@ short context_flags[];
 #include "out.h"
 
 
-#define same_a(p1, p2) (p1->token eq p2->token and p1->rno eq p2->rno)
+extern
+short context_flags[];
+
+#define debugG G.xflags['g'-'a']
+
+
+static short is_real(NP lp, NP rp)
+{
+#if FLOAT
+	if (G.use_FPU)
+		if (lp->ty eq ET_R or rp->ty eq ET_R)
+			return REAL;
+#endif
+	return 0;
+}
+
+static
+void pf(BOPS *bop)
+{
+	console("'%s'\t= %004x\n", bop->op, bop->opflags);
+}
+
+VpV popflags
+{
+	pf(&bop_cmp);
+	pf(&bop_eor);
+	pf(&bop_fcp);
+	pf(&bop_mul);
+	pf(&bop_div);
+	pf(&bop_mod);
+	pf(&bop_and);
+	pf(&bop_or);
+	pf(&bop_add);
+	pf(&bop_sub);
+	pf(&bop_asl);
+	pf(&bop_asr);
+	pf(&bop_rol);
+	pf(&bop_ror);
+	pf(&bop_fadd);
+	pf(&bop_fsub);
+	pf(&bop_assign);
+}
 
 
 #if FLOAT
@@ -83,7 +120,7 @@ void linherit(NP np)
 {
 	NP lp = np->left;
 	inherit(np, lp);
-	np->cflgs.f.cdec |= lp->cflgs.f.cdec;
+	c_mods(np, lp);				/* 09'19 HR: v6 correct pascal behaviour */
 	np->eflgs.f.lname = 1;
 }
 
@@ -95,7 +132,7 @@ void rinherit(NP np)
 }
 
 static
-ushort class(NP np, ushort fop)
+ushort class(NP np, ushort flop)
 {
 	short imm = np->eflgs.f.imm;
 
@@ -138,7 +175,7 @@ ushort class(NP np, ushort fop)
 	There were no bits left for, say, FopM flags.
 	The flag is only given for class(ip).
 */
-		if (np->rno <= Dhigh and fop)
+		if (np->rno <= Dhigh and flop)
 			return CL_ADR;
 		if (np->rno >= FREG and np->rno <= Fhigh)	/* 06'11 HR */
 			return CL_DREG|CL_FREG;
@@ -180,7 +217,7 @@ ulong canflag(ulong l, ulong r)
 {
 	if (r > sizeof(cansh))
 	{
-		message(0, 0, "canflag %ld", r);
+		message("canflag %ld", r);
 		return l;
 	}
 	return l << cansh[r];
@@ -316,7 +353,7 @@ short cando(NP np, ushort flags, ulong restr, ushort lc, ushort rc)
 }
 
 static
-void dotbl(MTBL *pt, MTBL *ct, NP np)
+void dotbl(MTBL *pt, NP np)
 {
 	if (pt->needregs or pt->needd or pt->needa)
 	{
@@ -347,7 +384,7 @@ static
 void pr_class(NP np, ushort fop, short cl, char *s)
 {
 	short imm = np->eflgs.f.imm;
-	message(0, 0, "%s %s, imm %d, fop 0x%04x, rno %d class 0x%04x", s, ptok(np->token), imm, fop, np->rno, cl);
+	message("%s %s, imm %d, fop 0x%04x, rno %d class 0x%04x", s, ptok(np->token), imm, fop, np->rno, cl);
 }
 
 static
@@ -355,8 +392,6 @@ bool fix_sub(NP np, ushort flags, MTBL *pt)
 {
 	short lc = class(np->left, flags&REAL),	/* Ran out of bits for Fop.. flags */
 	      rc = class(np->right,flags&REAL);
-
-	MTBL *ct = pt;		/* current table */
 
 	while (pt->restr)
 	{
@@ -369,32 +404,32 @@ bool fix_sub(NP np, ushort flags, MTBL *pt)
 
 		if (rv eq 0)
 		{
-			dotbl(pt, ct, np);
+			dotbl(pt, np);
 			return true;
 		}
 		pt++;
 	}
-	messagen(0, 0, np, "Internal error: no code table match! ");
+	messagen(np, "Internal error: no code table match! ");
 	return false;
 }
 
 static
-bool fix2ops(NP np, BOPS *bop, short extraflags)
+bool fix2ops(NP np, BOPS *bop)
 {
 	bool r;
+	ushort flgs = bop->opflags | is_real(np->left, np->right);
 
 	canswap = bop->opflags & ASSOC;
 	name_to_str(np, bop->op);
 
 #if FLOAT
-	if (extraflags&REAL)
-		r = fix_sub(np, bop->opflags|REAL, tblf2);
+	if (flgs&REAL)
+		r = fix_sub(np, flgs, tblf2);
 	else
 #endif
-		r = fix_sub(np, bop->opflags, tbl2);
+		r = fix_sub(np, flgs, tbl2);
 
-	if ((extraflags & 1) eq 0)
-		side_cc(np);
+	side_cc(np);		/* this is about condition code Z */
 	return r;
 }
 
@@ -470,7 +505,7 @@ long onearg(NP np)
 		and is_immed(np))
 	{
 		np->eflgs.f.imm = 0;
-		addcode(np, "\tpea  \t\tA" C(onearg imm) "\n");
+		addcode(np, "\tpea \t\tA" C(onearg imm) "\n");
 		return DOT_L;
 	}
 
@@ -506,7 +541,7 @@ long onearg(NP np)
 					addcode(np, "\tldxS\tR1\tA\n\tpshS\t\tR1" C(onearg r1 dreg or fcon) "\n");
 					rfree(np->r1);
 				othw
-message(0,0,"F r1 in use %d", np->r1);
+message("F r1 in use %d", np->r1);
 					np->r2 = ralloc(FREG, np);
 					addcode(np, "\tldxS\tR2\tA\n\tpshS\t\tR2" C(onearg r2 dreg or fcon) "\n");
 					rfree(np->r2);
@@ -545,7 +580,7 @@ message(0,0,"F r1 in use %d", np->r1);
 				addcode(np, "\tfsN \tR1\n\tanxS\tR1\t#1" C(onearg fcc) "\n");
 		else
 #endif
-			addcode(np, "\tsN  \tR1\n\tanxS\tR1\t#1" C(onearg cc) "\n");
+			addcode(np, "\tsN \tR1\n\tanxS\tR1\t#1" C(onearg cc) "\n");
 			addcode(np, "\tpsh \t\tR1\n");
 		return DOT_W;
 	}
@@ -572,7 +607,7 @@ message(0,0,"F r1 in use %d", np->r1);
 				addcode(np, "\twmvs.b\tR1\tA\n\tpsh.w\t\tR1" C(onearg r1 char) "\n");
 			rfree(np->r1);
 		othw
-message(0,0,"D r1(%d) in use: use r2(%d)", np->r1, np->r2);
+message("D r1(%d) in use: use r2(%d)", np->r1, np->r2);
 			np->r2 = ralloc(DREG, np);
 			if (np->ty eq ET_U)
 				addcode(np, "\twmvz.b\tR2\tA\n\tpsh.w\t\tR2" C(onearg r2 uchar) "\n");
@@ -607,7 +642,7 @@ long arg_sizes(NP args)	/* was argmod(); onearg() now called in the right places
 		args->tt = args->right
 				 ? EV_RL
 				 : EV_LEFT;			/* this is for out_expr() */
-		size += args->left->size;	/* only size needed */
+		size += args->left->size;
 		args = args->right;
 	}
 
@@ -720,7 +755,7 @@ static
 NREG need_left(NP np)
 {
 	NREG r = need_r(0, 0, 0),
-		 l = np->left->needs;;
+		 l = np->left->needs;
 	if (yareg(np))
 		r.a = l.a+1;
 #if FLOAT
@@ -813,7 +848,7 @@ void eval_order(NP np, ALREG max)
 		case NOT:
 			np->needs = merge(l, need_r(1, 0, 0));
 			break;
-		case SELECT:
+		case SELECTOR:
 			if (np->fld.width)
 				np->needs = merge(l, need_r(1, 0, 0));
 			else
@@ -954,23 +989,27 @@ static
 bool optadd(NP np, short flags, short sign)
 {
 	NP lp = np->left, rp = np->right;
+	short ltok = lp->token;
 
 	if (rp->token ne ICON or !is_immed(rp))
 		return false;
 
 	if (is_immed(lp))
 	{
-		if (lp->token eq OREG or lp->token eq ONAME)
+		if (   ltok eq OREG
+		    or ltok eq ONAME
+		    or ltok eq O_ABS			/* 09'19 HR: v6 O_ABS as well */
+		   )
 		{
 			linherit(np);
-			rp->val.i  = sign * rp->val.i;
+			rp->val.i  = sign * rp->val.i; 
 			np->val.i += rp->val.i;
 			if ((flags & IMMA_OK) eq 0)
 				imm_oreg(np);
 			return true;
 		}
 	othw					/* ptradd with icon  eg: *(p+6) */
-		if (lp->token eq REGVAR and isareg(lp) )
+		if (ltok eq REGVAR and isareg(lp) )
 		{
 			linherit(np);
 			np->token = OREG;
@@ -1032,22 +1071,38 @@ bool is_address(NP np)		/* Not good enough yet (without AHCC now behaves like Pu
 	return false;
 }
 
+#if OFFS
+/* 07'19 HR: v6 repair Pure C style offsetof */
+static
+bool icon_plus_icon(NP np)
+{
+		NP lp = np->left,
+		   rp = np->right;
+
+		if (lp->token eq ICON and rp->token eq ICON)
+		{
+			np->token = ICON;
+			np->val.i = lp->val.i + rp->val.i;
+			to_cp(np);
+			to_immed(np);
+			return true;
+		}
+	return false;	
+}
+#endif
+
+
 static
 bool b_sube(NP np, RMASK r_inhib, short flags)
 {
 	NP lp = np->left, rp = np->right;
-	short fop = 0;
+	short fop = is_real(lp, rp);
 	long size = np->size;
 
 	inhibit = r_inhib;
 	reserve |= r_inhib;
 
-#if FLOAT
-	if (G.use_FPU)
-		if (lp->ty eq ET_R or rp->ty eq ET_R)
-			fop = REAL;	/* either 0 Long, Int or 0x8000 Real */
-#endif
-
+	/* float assign operations already unfolded. */
 	if (is_ass_op(np->token))
 		switch (np->token-(ASSIGN 0))
 		{
@@ -1087,10 +1142,10 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 	case CALL:			/* binary: at least 1 arg */
 #if FOR_A
 		if (lp->token eq STMT)
-			addcode(np, "\tbra  \t\t<L1\n<L2:\t\t" C(u_sube primary stmt) "\n");
+			addcode(np, "\tbra \t\t<L1\n<L2:\t\t" C(u_sube primary stmt) "\n");
 		elif (lp->aflgs.f.lproc)
 		{
-			addcode(np, "\tjsl  \t\t<A" C(b_sube local call) "\n");
+			addcode(np, "\tjsl \t\t<A" C(b_sube local call) "\n");
 			if (aggregate(np))
 				np->token = OREG;
 			else
@@ -1100,7 +1155,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 #endif
 
 		lp->misc = arg_sizes(rp);	/* misc for #K */
-
+		
 	/*	aggreg return:
 		does not return AREG anymore, but a tempvar in local name space
 		who's off and size are set in the CALL node by untype()
@@ -1116,26 +1171,26 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 		else
 			ret_df_reg(np);
 
-		if (lp->cflgs.f.sysc)		/* 01'12 HR */
+		if (lp->xflgs.f.sysc)		/* 01'12 HR */
 			sys_call(np);
 		else
 			/* K = stack adjust, ^L = reglist for args in regs (for optimizer) */
-			if (lp->cflgs.f.cdec)
-				if (lp->cflgs.f.inl_v)
+			if (lp->xflgs.f.cdec)
+				if (lp->xflgs.f.inl_v)
 				{
 					to_inl_v(np);
 					addcode(np, "\tinlv \t\t<A,<K" C(b_sube cdecl inlv) "\n");
 				}
 				else
-					addcode(np, "\tjsr  \t\t<A,<K" C(b_sube cdecl call) "\n");
+					addcode(np, "\tjsr \t\t<A,<K" C(b_sube cdecl call) "\n");
 			else
-				if (lp->cflgs.f.inl_v)
+				if (lp->xflgs.f.inl_v)
 				{
 					to_inl_v(np);
 					addcode(np, "\tinlv \t\t<A,<K<^L" C(b_sube argreg inlv) "\n");
 				}
 				else
-					addcode(np, "\tjsr  \t\t<A,<K<^L" C(b_sube argreg call) "\n");
+					addcode(np, "\tjsr \t\t<A,<K<^L" C(b_sube argreg call) "\n");
 		return true;
 	case COMMA:
 		rinherit(np);
@@ -1161,7 +1216,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 			np->lbl = new_lbl();
 			free1(nil, rp);
 			retreg(np, ralloc(DREG, np));
-			addcode(np, "\tldx  \tA\t#1\n\tbra  \t\tL1\nLf:\n\tclx  \tA" C(b_sube and_or_false) "\nL1:\n" );
+			addcode(np, "\tldx \tA\t#1\n\tbra \t\tL1\nLf:\n\tclx \tA" C(b_sube and_or_false) "\nL1:\n" );
 			np->ty = ET_S;			/* 11'09 HR adjust */
 		}
 		return true;
@@ -1232,14 +1287,14 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 			if (!lp->brt and !lp->eflgs.f.cc)
 			{
 				if (isareg(lp))
-					addcode(np, "\tcpx  \t<A\t#0" C(cmp0 areg) "\n");
+					addcode(np, "\tcpx \t<A\t#0" C(cmp0 areg) "\n");
 #if FLOAT
 				elif (is_sw_dbl(lp))			/* We know s/w dbl  cannot reside in any register. */
-					addcode(np, "\tpea  \t\t<A\n\tjsr  \t\t_dcmp0,#4\n" C(cmp0 dbl) "\n");		/* this is an opportunistic solution */
+					addcode(np, "\tpea \t\t<A\n\tjsr \t\t_dcmp0,#4\n" C(cmp0 dbl) "\n");		/* this is an opportunistic solution */
 #endif
 #if LL
 				elif (is_ll(np))				/* We know longlong cannot reside in any register. */
-					addcode(np, "\tpea  \t\t<A\n\tjsr  \t\t_llcmp0,#4\n" C(cmp0 ll) "\n");		/* this is an opportunistic solution */
+					addcode(np, "\tpea \t\t<A\n\tjsr \t\t_llcmp0,#4\n" C(cmp0 ll) "\n");		/* this is an opportunistic solution */
 #endif
 
 #if 0
@@ -1249,7 +1304,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 				{
 					flags &= ~CC_OK;				/* dont test */
 					addcode(np, "\tbra \t\tL1" C(cmp0 ptr) "\n");
-					message(0,0,"[2]address::0, brt=%s",ptok(np->brt));
+					message("[2]address::0, brt=%s",ptok(np->brt));
 				}
 #endif
 /* constant expression? either branch or fall through
@@ -1289,7 +1344,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 					if ((G.Coldfire and lp->token eq ONAME) or lp->token eq OLNAME)
 					{
 						tempr(np, AREG);
-						addcode(np, "\tlmx  \tR1\t<A\n\ttst<S\t\tR1." C(cmp0 cf) "\n");
+						addcode(np, "\tlmx \tR1\t<A\n\ttst<S\t\tR1." C(cmp0 cf) "\n");
 					}
 					else
 #endif
@@ -1326,7 +1381,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 			else
 				return fix_sub(np, bop_mul.opflags, tblmul);
 		else
-			return fix2ops(np, &bop_mul, fop);
+			return fix2ops(np, &bop_mul);
 	case SCALE:
 		if (size eq DOT_L and !(np->right->size eq DOT_W and np->left->size eq DOT_W))
 			return fix_sub(np, bop_mul.opflags, tbllscale);
@@ -1342,7 +1397,7 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 			                      (   np->ty eq ET_U
 			                       or np->ty eq ET_P ? tbludiv : tbldiv) );
 		else
-			return fix2ops(np, &bop_div, fop);
+			return fix2ops(np, &bop_div);
 	case MOD:
 		if (!fop)
 			if (size eq DOT_L)
@@ -1352,16 +1407,22 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 			                      (   np->ty eq ET_U
 			                       or np->ty eq ET_P ? tblumod : tblmod));
 		else
-			return fix2ops(np, &bop_mod, fop);
+			return fix2ops(np, &bop_mod);
 	case BINAND:
-		return fix2ops(np, &bop_and, 0);
+		return fix2ops(np, &bop_and);
 	case BINOR:
-		return fix2ops(np, &bop_or, 0);
+		return fix2ops(np, &bop_or);
 	case BINEOR:
-		return fix2ops(np, &bop_eor, G.Coldfire);
+		return fix2ops(np, &bop_eor);
 	case INDEX:
 	{
 		bool ret;
+/* 07'19 HR: v6 repair Pure C style offsetof: icon_plus_icon */
+#if OFFS
+		if (icon_plus_icon(np))
+			ret = true;
+		else
+#endif
 		if (optadd(np, flags, 1))
 			ret = true;
 		else
@@ -1372,28 +1433,28 @@ bool b_sube(NP np, RMASK r_inhib, short flags)
 		if (optadd(np, flags, 1))
 			return true;
 		if (fop)
-			return fix2ops(np, &bop_fadd, fop);
+			return fix2ops(np, &bop_fadd);
 		if (np->left->ty eq ET_P)
 			return fix_index(np, &bop_add);
-		return fix2ops(np, &bop_add, fop);
+		return fix2ops(np, &bop_add);
 	case MINUS:
 
 		if (optadd(np, flags, -1))
 			return true;
 		if (fop)
-			return fix2ops(np, &bop_fsub, fop);
+			return fix2ops(np, &bop_fsub);
 		if (    np->left ->ty eq ET_P
 		    and np->right->ty ne ET_P)			/* right not pointer */
 			return fix_index(np, &bop_sub);
-		return fix2ops(np, &bop_sub, fop);
+		return fix2ops(np, &bop_sub);
 	case SHL:
-		return fix2ops(np, &bop_asl, fop);
+		return fix2ops(np, &bop_asl);
 	case SHR:
-		return fix2ops(np, &bop_asr, fop);
+		return fix2ops(np, &bop_asr);
 	case ROL:
-		return fix2ops(np, &bop_rol, fop);
+		return fix2ops(np, &bop_rol);
 	case ROR:
-		return fix2ops(np, &bop_ror, fop);
+		return fix2ops(np, &bop_ror);
 	case ASS:
 		if (specasn(np) or strasn(np, false))
 			return true;

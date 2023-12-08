@@ -771,8 +771,6 @@ short isspace(short c) { return _ctype[(uchar)c] & _CTs; }
 short isupper(short c) { return _ctype[(uchar)c] & _CTu; }
 short isxdigit(short c){ return _ctype[(uchar)c] & _CTx; }
 short isblank (short c){ return _ctype[(uchar)c] & _CTb; }
-short is_alpha(short c){ return c == '_' || (_ctype[(uchar)c] & (_CTu|_CTl)) != 0; }
-short is_alnum(short c){ return c == '_' || (_ctype[(uchar)c] & (_CTu|_CTl|_CTd)) != 0; }
 
 /*
  *  qsort functions

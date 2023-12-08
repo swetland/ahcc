@@ -31,7 +31,7 @@ void _crystal(void *aespb)
 	AES(aespb);
 }
 
-short G_decl appl_init(void)
+short  appl_init(void)
 {
 	short io = -1;
 	SETACTL(10, 0, 1, 0, 0);
@@ -47,7 +47,7 @@ short G_decl appl_init(void)
 	return io;
 }
 
-short G_decl appl_read(short rid, short rl, void *rb)
+short  appl_read(short rid, short rl, void *rb)
 {
 	short ii[2], io;
 	SETACTL(11, 2, 1, 1, 0);
@@ -57,7 +57,7 @@ short G_decl appl_read(short rid, short rl, void *rb)
 	return io;
 }
 
-short G_decl appl_write(short wid, short wl, void *wb)
+short  appl_write(short wid, short wl, void *wb)
 {
 	short ii[2], io;
 	SETACTL(12, 2, 1, 1, 0);
@@ -67,7 +67,7 @@ short G_decl appl_write(short wid, short wl, void *wb)
 	return io;
 }
 
-short G_decl appl_tplay(void *mem, short num, short scale)
+short  appl_tplay(void *mem, short num, short scale)
 {
 	short ii[2], io;
 	SETACTL(14, 2, 1, 1, 0);
@@ -77,7 +77,7 @@ short G_decl appl_tplay(void *mem, short num, short scale)
 	return io;
 }
 
-short G_decl appl_trecord(void *mem, short num)
+short  appl_trecord(void *mem, short num)
 {
 	short ii = num, io;
 	SETACTL(15, 1, 1, 1, 0);
@@ -86,7 +86,7 @@ short G_decl appl_trecord(void *mem, short num)
 	return io;
 }
 
-short G_decl appl_search(short mode, char *name, short *type, short *id)
+short  appl_search(short mode, char *name, short *type, short *id)
 {
 	short ii = mode, io[3];
 	SETACTL(18, 1, 3, 0, 0);
@@ -97,7 +97,7 @@ short G_decl appl_search(short mode, char *name, short *type, short *id)
 	return io[0];
 }
 
-short G_decl appl_control(short id, int what, void *out)
+short  appl_control(short id, int what, void *out)
 {
 	short ii[2], io;
 	SETACTL(129, 2, 1, 1, 0);
@@ -109,7 +109,7 @@ short G_decl appl_control(short id, int what, void *out)
 	return io;
 }
 
-short G_decl appl_getinfo(short ty,
+short  appl_getinfo(short ty,
                   short *o1, short *o2, short *o3, short *o4)
 {
 	short ii = ty, io[5];
@@ -123,7 +123,7 @@ short G_decl appl_getinfo(short ty,
 	return io[0];
 }
 
-short G_decl appl_find(const char *name)
+short  appl_find(const char *name)
 {
 	short io;
 	SETACTL(13, 0, 1, 1, 0);
@@ -131,7 +131,7 @@ short G_decl appl_find(const char *name)
 	return io;
 }
 
-short G_decl appl_yield(void)
+short  appl_yield(void)
 {
 	short io;
 	SETACTL(17, 0, 1, 0, 0);
@@ -139,7 +139,7 @@ short G_decl appl_yield(void)
 	return io;
 }
 
-short G_decl appl_exit(void)
+short  appl_exit(void)
 {
 	short io;
 	SETACTL(19, 0, 1, 0, 0);

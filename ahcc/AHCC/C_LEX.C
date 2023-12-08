@@ -64,7 +64,6 @@
 #include <stdlib.h>
 #endif
 
-void console(char *, ...);
 
 #ifdef TOK_FREQ
 static
@@ -102,6 +101,8 @@ char *pcat(short c)
 global
 void pr_lex(LEX_RECORD *s, char *txt)
 {
+	void console(Cstr, ...);
+
 	console("LEX records '%s'\n", txt);
 	while(s->cat ne eof)
 	{
@@ -235,6 +236,7 @@ uchar C_oct[256] =
 
 #if SCONSPLIT
 /* must not split a escape sequence !! */
+static
 uchar * split(uchar *t, uchar *s)	/* s points past a string */
 {
 	uchar *p;
@@ -247,7 +249,7 @@ uchar * split(uchar *t, uchar *s)	/* s points past a string */
 }
 
 #endif
-
+/*
 uint next_s(uchar **s)
 {
 	uint c = **s;
@@ -265,14 +267,16 @@ size_t ltos(Wstr o, long l)
 	while(*a) *o++=*a++;
 	return o - p;
 }
+*/
 
-
+/* 01'20 HR comlin for more useful comment errors */
 global
-long C_lexical(short which, Cstr name, bool I, Cstr input, LEX_RECORD *output, long *lines, VpPE *perr, bool nest_com, short lang)
+long C_lexical(Cstr name, bool I, Cstr input, LEX_RECORD *output, long *lines, VpPE *perr, bool nest_com, short lang)
 {
 	LEX_RECORD *out = output;
 	uchar *s = (uchar *)input;
-	long l, tot = 0, lineno = 1, incom = 0;
+	bool incom = false;
+	long l, tot = 0, lineno = 1, comlin;
 	short t, ti, nr = 0;
 	while (*s)					/* input is a true C string */
 	{
@@ -350,7 +354,8 @@ long C_lexical(short which, Cstr name, bool I, Cstr input, LEX_RECORD *output, l
 				elif (t eq mop and c eq '/' and *s eq '*')
 				{
 					short lvl = 0;
-					incom = 1;
+					incom = true;
+					comlin = lineno;
 
 					s++;
 					while (*s)
@@ -364,7 +369,7 @@ long C_lexical(short which, Cstr name, bool I, Cstr input, LEX_RECORD *output, l
 							s += 2;
 							if (lvl eq 0)
 							{
-								incom = 0;
+								incom = false;
 								break;
 							}
 							lvl--;
@@ -569,7 +574,7 @@ long C_lexical(short which, Cstr name, bool I, Cstr input, LEX_RECORD *output, l
 		if (l > MAX_LEX and perr)
 		{
 			if (t ne ws)
-				perr("[%d] token %d of size %ld is larger than %d characters", which, nr, o - out->text - 1, MAX_SCON);
+				perr("token %d of size %ld is larger than %d characters", nr, o - out->text - 1, MAX_SCON);
 			l = MAX_LEX;
 			out->text[MAX_SCON] = 0;	/* 07'15 v5.2 */
 		}
@@ -593,7 +598,7 @@ long C_lexical(short which, Cstr name, bool I, Cstr input, LEX_RECORD *output, l
 /* single insertion as a test of diff() */
 
 	if (incom and perr)
-		perr("EOF in comment");			/* 02'12 HR */
+		perr("EOF in comment started at line %ld", comlin);			/* 02'12 HR */
 
 	if (lines)
 		*lines = lineno;

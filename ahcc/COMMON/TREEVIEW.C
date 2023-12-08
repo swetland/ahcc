@@ -38,6 +38,7 @@
 #include "cursor.h"
 #include "common/options.h"
 #include "common/cursor.h"
+#include "files.h"
 #include "common/ahcm.h"
 #include "common/treeview.h"
 
@@ -106,7 +107,7 @@ SIZED trv_sizew
 	get_work(w);
 	w->norm.pos.y  = bounce(w,w->norm.pos.y);
 	do_redraw(w, w->wa);
-	v_slider(w);
+	via (w->slider)(w);
 }
 #endif
 
@@ -134,8 +135,7 @@ IT * treeview_window(Cstr name,
 					M_S *wmenu,
 					INFO_T type)
 {
-	IT * w = create_IT(
-				true,
+	IT * w = create_IT(true,
 				name,
 				0,
 				nil,
@@ -188,16 +188,18 @@ IT * treeview_window(Cstr name,
 				nil,
 				0L,
 				deskw.unit,
+				0,		/* 07'20 HR v6 */
 				13,
+				0,
 				nil
 				);
 
 #ifdef COFT
 	if (w)
 	{
-		extern S_path mkfn;
 		w->trv.wicon = write_icon;
 		w->trv.dp    = root;
+		w->norm.pos.y = 0;
 	}
 #endif
 	return w;
@@ -326,7 +328,7 @@ NSP find_xy(NSP np, short x, short y)
 	}
 	return np;
 }
-
+/*
 static
 NSP find_y(NSP np, short y)
 {
@@ -342,7 +344,7 @@ NSP find_y(NSP np, short y)
 	}
 	return np;
 }
-
+*/
 global
 NSP trv_find_ln(NSP np, short ln)
 {
@@ -359,90 +361,99 @@ NSP trv_find_ln(NSP np, short ln)
 	return np;
 }
 
-static
-BUTTON trv_button
+static void trv_select(IT *w, NSP fx, short b)
 {
-	if (button eq 1)	/* left button */
+#ifdef TEXTFILE
+	if (b > 1 and fx->trv_txt)
+		open_text_file(fx->trv_txt);
+	else
+#endif
 	{
-		NSP fx = find_xy(w->trv.root,mx,my);
-		if (fx)
-		{
-			w->trv.sel = fx;
-			via (w->select)(w);
-		othw
-			fx = find_y(w->trv.root,my);
-			if (fx)
-			{
-				int x = fx->r.x;
-				if (mx < x)
-				{
-
-					while(x-VLINE_W > mx and fx->o)
-						fx = fx->o, x-=VLINE_W;
-					w->trv.sel = fx->o;
-					via (w->select)(w);
-				}
-			}
-		}
+		w->trv.sel = fx;
+		via (w->select)(w);
 	}
 }
 
 static
-void v_lin(short x, short y)
+BUTTON trv_button
 {
-	line(v_hl,x+wchar,y,x+wchar,y+hchar-1);
+	NSP fx = find_xy(w->trv.root,mx,my);
+	if (fx)
+		trv_select(w, fx, button);
+/*	else
+	{
+		fx = find_y(w->trv.root,my);
+		if (fx)
+		{
+			int x = fx->r.x;
+			if (mx < x)
+			{
+
+				while(x-VLINE_W > mx and fx->o)
+					fx = fx->o, x-=VLINE_W;
+				trv_select(w, fx->o, button);
+			}
+		}
+	}
+*/
 }
 
 static
-void e_lin(short x, short y)
+void v_lin(short hl, short x, short y)
+{
+	line(hl,x+wchar,y,x+wchar,y+hchar-1);
+}
+
+static
+void e_lin(short hl,short x, short y)
 {
 	short x1 = x+wchar, y1 = y+hchar/2;
 
-	line(v_hl,x1,y,x1,y1);
-	line(v_hl,x1,y1,x+VLINE_W-1,y1);
+	line(hl,x1,y,x1,y1);
+	line(hl,x1,y1,x+VLINE_W-1,y1);
 }
 
 static
-void h_lin(short x, short y)
+void h_lin(short hl,short x, short y)
 {
 	short y1 = y+hchar/2;
-	v_lin(x,y);
-	line(v_hl,x+wchar,y1,x+VLINE_W-1,y1);
+	v_lin(hl,x,y);
+	line(hl,x+wchar,y1,x+VLINE_W-1,y1);
 
 }
 
 static
-short vlines(NSP np, short x, short y)
+short vlines(short hl,NSP np, short x, short y)
 {
 	if (np and np->dep)
 	{
-		x = vlines(np->o,x,y);
+		x = vlines(hl,np->o,x,y);
 		if (np->n)
 			if (np->n->f ne EMP)
-				v_lin(x,y);
+				v_lin(hl,x,y);
 		x += VLINE_W;
 	}
 	return x;
 }
 
 static
-void hlines(NSP np, short x, short y)
+void hlines(short hl,NSP np, short x, short y)
 {
 	if (np and np->dep)
 	{
-		x = vlines (np->o,x,y);
+		x = vlines (hl,np->o,x,y);
 		if (np->f ne EMP)
 		{
 			if (!np->n or (np->n and np->n->f eq EMP) )
-				e_lin(x,y);
+				e_lin(hl,x,y);
 			else
-				h_lin(x,y);
+				h_lin(hl,x,y);
 		}
 	}
 }
 
 static
-WICON trv_icon /* (RECT r, bool op, bool sel, bool kleur) */
+WICON trv_icon /* (short hl, RECT r, bool op, bool sel, bool kleur) */
 {
 	RECT ri;
 	short hh = half_h(),
@@ -458,27 +469,27 @@ WICON trv_icon /* (RECT r, bool op, bool sel, bool kleur) */
 	ri.h = ww-1;
 	h1 = ri.h/2;
 	w1 = ri.w/2;
-	gsbox(v_hl, ri);
+	gsbox(hl, ri);
 
 	/* minus */
-	line(v_hl,ri.x+2, ri.y+h1  , ri.x+ri.w-3, ri.y + h1  );
+	line(hl,ri.x+2, ri.y+h1  , ri.x+ri.w-3, ri.y + h1  );
 	if (hh < hchar)
-		line(v_hl,ri.x+2, ri.y+h1-1, ri.x+ri.w-3, ri.y + h1-1);
+		line(hl,ri.x+2, ri.y+h1-1, ri.x+ri.w-3, ri.y + h1-1);
 	if (!op)
 	{	/* make it a plus */
 		if (hh < hchar)
-			line(v_hl, ri.x+w1-1, ri.y+2, ri.x+w1-1, ri.y+ri.h-3);
-		line(v_hl, ri.x+w1  , ri.y+2, ri.x+w1  , ri.y+ri.h-3);
+			line(hl, ri.x+w1-1, ri.y+2, ri.x+w1-1, ri.y+ri.h-3);
+		line(hl, ri.x+w1  , ri.y+2, ri.x+w1  , ri.y+ri.h-3);
 	}
 
 	if (sel)
 	{
 		ri.x += 1, ri.y += 1, ri.w -= 2, ri.h -= 2;
-		vswr_mode(v_hl, 3);
-		vsf_color(v_hl, 1);
-		gspbox   (v_hl, ri);
-		vswr_mode(v_hl, 0);
-		vsf_color(v_hl, 0);
+		vswr_mode(hl, 3);
+		vsf_color(hl, 1);
+		gspbox   (hl, ri);
+		vswr_mode(hl, 0);
+		vsf_color(hl, 0);
 	}
 }
 
@@ -520,7 +531,8 @@ void trv_line(IT *w, NSP np)
 	RECT r;
 	char ln[2*MAXL+1], *p = ln, *q = ln;
 
-	short y = w->trv.y;
+	short y  = w->trv.y,
+	      hl = w->vhl;
 	w->line = ln;
 
 	*p = 0;	 /* for xcat */
@@ -551,24 +563,24 @@ void trv_line(IT *w, NSP np)
 	rl = p - q; /* strlen(w->line); */
 
 	if (rl > w->norm.pos.x)
-		v_gtext(w->hl,w->wa.x,y,w->line+w->norm.pos.x);
+		v_gtext(hl,w->wa.x,y,w->line+w->norm.pos.x);
 
 	if (np->f eq NEST)
 	{
-		via(w->trv.wicon)(r,np->d ne nil, (np->state&SELECTED) ne 0, scr.kleuren > 2);
+		via(w->trv.wicon)(hl,r,np->d ne nil, (np->state&SELECTED) ne 0, scr.kleuren > 2);
 		else
-			trv_icon(r,np->d ne nil, (np->state&SELECTED) ne 0, scr.kleuren > 2);	/* standard (+,-) icon */
+			trv_icon(hl,r,np->d ne nil, (np->state&SELECTED) ne 0, scr.kleuren > 2);	/* standard (+,-) icon */
 	}
 
-	hlines(np,w->wa.x-w->norm.pos.x*wchar,y);
+	hlines(hl,np,w->wa.x-w->norm.pos.x*wchar,y);
 
 	if (np->state&SELECTED and np->f eq TERM)
 	{
-		vswr_mode(w->hl,3);
-		vsf_color(w->hl,1);
-		gpbox(w->hl,r.x+wchar,r.y,r.w-wchar,r.h);
-		vswr_mode(w->hl,0);
-		vsf_color(w->hl,0);
+		vswr_mode(hl,3);
+		vsf_color(hl,1);
+		gpbox(hl,r.x+wchar,r.y,r.w-wchar,r.h);
+		vswr_mode(hl,0);
+		vsf_color(hl,0);
 	}
 
 	if ( r.x + r.w < w->wa.x + w->wa.w )			/* erase rest of line */
@@ -577,7 +589,7 @@ void trv_line(IT *w, NSP np)
 		r.x += r.w;
 		r.w = (w->wa.x+w->wa.w) - ew;
 		if (r.w > 0)
-			gspbox(w->hl,r);
+			gspbox(hl,r);
 	}
 
 	w->trv.y = y + hchar;
@@ -622,5 +634,5 @@ void trv_adjust(IT *w, NSP np)
 	w->view.sz.w = w->norm.sz.w;
 	get_work(w);
 	do_redraw(w, w->wa);
-	v_slider(w);
+	via(w->slider)(w);
 }

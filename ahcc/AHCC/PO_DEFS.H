@@ -80,7 +80,7 @@ podef("udvx",0,		DOT_W,	0,			REF|SET,	REF,		0			,UDVX )
 podef("dvx",0,		DOT_W,	0,			REF|SET,	REF,		0			,DVX )
 podef("umdx",0,		DOT_W,	0,			REF|SET,	REF,		0			,UMDX )
 podef("mdx",0,		DOT_W,	0,			REF|SET,	REF,		0			,MDX )
-#if COLDFIRE || FLOAT
+#if  COLDFIRE || FLOAT
 podef("urmx",0,		DOT_L,	0,			SET,		REF,		REF			,URMX )
 podef("rmx",0,		DOT_L,	0,			SET,		REF,		REF			,RMX )
 #endif
@@ -261,7 +261,8 @@ podef("rga", 0,		DOT_W,	0,			0,			0,			0			,RGA )
 #if FLOAT
 podef("rgf", 0,		DOT_X,	0,			0,			0,			0			,RGF )
 #endif
-podef("reg", 0,		0,		0,			0,			0,			0			,REGL )
+/* notion REG already in use. */
+podef("reg", 0,		0,		0,			0,			0,			0			,RGL )
 podef("loc", 0,		0,		0,			0,			0,			0			,LOC )
 podef("begin",0,	0,		0,			0,			REF,		0			,BEGIN )
 podef("end", 0,		0,		0,			0,			REF,		0			,END )

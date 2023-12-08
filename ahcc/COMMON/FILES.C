@@ -47,12 +47,12 @@
 #include "digger/digobj.h"
 #endif
 
-#if BINARY
+#if BINED
 #include "bined/ed.h"
 #endif
 
 #if WKS
-FOPEN open_sheet;
+FOPEN open_sheet, open_db;
 void cinf_upd(IT *w, CINF *ci);
 #endif
 
@@ -102,17 +102,9 @@ bool write_out(IT *w, char *fn)
 
 			while (*u) *t++=*u++,ll++;
 
-#if INTERNAL
-			{
-				static short sll=1;
-				if (ll ne s->xl and sll)
-					sll=0,
-					alertm("Internal error | inconsistent: | ll:%d, s->xl:%d ",ll,s->xl);
-			}
-#endif
 			if (stmcur(*m) eq stmlast(*m))
 			{
-				if (!s->xl)
+				if (!s->x_l)
 					break;
 			}
 			else
@@ -206,7 +198,7 @@ void textfile(short mt)		/* open speficly via menu */
 }
 #endif
 
-#if BINARY
+#if BINED
 void open_DMA(void);
 static
 void binary_file(short mt)
@@ -259,7 +251,7 @@ void open_startfile(char *fn, short fl, short ty, F_CFG *q)
 #if DIGGER
 	if (   (     ty > 0 and ty eq OBJ)
 		or (     ty < 0
-	#if (WKS or TEXTFILE or MFRAC or BINARY)
+	#if (WKS or TEXTFILE or MFRAC or BINED)
 			and (  findsuf(fn,".o"  ) eq 'o'
 				or findsuf(fn,".prg") eq 'p'
 				or findsuf(fn,".tos") eq 't'
@@ -302,13 +294,13 @@ void open_startfile(char *fn, short fl, short ty, F_CFG *q)
 		init_open_jrnl=false
 #elif MFRAC
 		open_mandel(fn, fl, nil);
-#elif BINARY
+#elif BINED
 		open_binary(fn, fl, nil);
 #endif
 	;
 }
 
-#if TEXTFILE || BINARY || WKS
+#if TEXTFILE || BINED || WKS
 static
 F_CFG  fcfg,
       *fcfg_base = nil;
@@ -332,7 +324,7 @@ OpEntry filtab[]=
 	{"sef =%d\n",6,&fcfg.se.pos.x},
 	{"sty =%d\n",6,&fcfg.sty},
 #endif
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 	{"LCFG= {}\n",0, floc_cfg,0,0},
 #endif
 	{"}      \n"},
@@ -342,7 +334,7 @@ OpEntry filtab[]=
 global
 CFGNEST file_cfg		/* FILE *fp, OpEntry **tab, short lvl, short io */
 {
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 	floctab = copyconfig(loctab, &cfg.loc, &fcfg.loc);
 #endif
 
@@ -364,10 +356,10 @@ CFGNEST file_cfg		/* FILE *fp, OpEntry **tab, short lvl, short io */
 					fcfg.se = w->se;
 					fcfg.sty = w->selty;
 					fcfg.selection = w->selection;
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 					fcfg.loc = w->loc;
 #endif
-#if BINARY
+#if BINED
 					fcfg.cu.pos.y = fcfg.cu.pos.y*w->bin.bw+fcfg.cu.pos.x;
 #endif
 					saveconfig(fp,filtab,lvl+1);
@@ -386,7 +378,7 @@ CFGNEST file_cfg		/* FILE *fp, OpEntry **tab, short lvl, short io */
 		}
 	}
 
-#if TEXTFILE || BINARY
+#if TEXTFILE || BINED
 	xfree(floctab);
 #endif
 }
@@ -438,7 +430,7 @@ void load_fcfg(void)
 #if TEXTFILE
 				find_current_line(w);
 #endif
-#if BINARY
+#if BINED
 				l_to_s_t(w,w->cu.pos.y);	/* checks cu.l against w->mapl and divides by window width */
 				w->loc = q->loc;
 				change_font(w, w->loc.font);
@@ -522,9 +514,7 @@ void init_files(short argc, char *argv[])
 		DIRcpy(&idir, argv[i]);
 		fn=argv[i];
 		if ( (fl=Fopen(fn,0)) > 0)
-		{
 			open_startfile(fn, fl, -1, nil);	/* we know only the name */
-		}
 		else
 			alert_msg(" Not opened: | %s ",fn);	/* jrnl not yet established */
 		i++;
@@ -583,12 +573,12 @@ void objectfile(short mt)
 #endif
 
 #ifdef WKS
-static
-void worksheet(short mt)
+
+char *get_fn(OBJECT *mn, short mt)
 {
-	char suf[6],*fn;
+	char suf[6];
 	short i=0;
-	char *me=get_freestring(Menu,mt);
+	char *me=get_freestring(mn,mt);
 
 	while (*me ne '.') me++;
 	while (*me ne ' ') suf[i++]=*me++;
@@ -600,10 +590,15 @@ void worksheet(short mt)
 	if (*fsel.s)
 		fsel = change_suffix(&fsel,suf);
 
-	fn=select_file(&idir, nil, &fsel, " Open calc sheet ", &drive);
+	return select_file(&idir, nil, &fsel, " Open calc sheet ", &drive);
+}
 
+static
+void worksheet(short mt)
+{
+	char *fn = get_fn(Menu,mt);
 	if (fn)
-		open_sheet(fn,0,nil);
+		open_sheet(fn, 0, nil);
 }
 #endif
 
@@ -672,7 +667,7 @@ void do_Open(short mt)
 	break;
 #endif
 
-#ifdef BINARY
+#ifdef BINED
 	case MNOPENB:
 		binary_file(mt);
 	break;

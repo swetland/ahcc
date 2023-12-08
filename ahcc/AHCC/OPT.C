@@ -40,7 +40,7 @@
 #include "reg.h"
 #include "peep.h"
 
-#define error send_msg
+#define error console
 
 #define debug_o (G.yflags['o'-'a'])
 #define debugR (G.xflags['r'-'a'])
@@ -65,7 +65,7 @@ void do_pcnts(void)
 #endif
 	{
 		console("Peep counts:\n");
-		send_msg("loops:%d\n", peep_loops);
+		console("loops:%d\n", peep_loops);
 		prcnt(p0_0);
 		prcnt(p0_1 );prcnt(p0_2 );prcnt(p0_3 );prcnt(p0_4 );prcnt(p0_5 );
 		prcnt(p0_11);prcnt(p0_12);prcnt(p0_13);prcnt(p0_14);prcnt(p0_15);
@@ -419,7 +419,7 @@ BP getsym(Cstr symbol)
 
 	while (sp)
 	{
-		if (strcmp(sp->name, symbol) eq 0)
+		if (SCMP(302, sp->name, symbol) eq 0)
 			return sp->symbol;
 		sp = sp->next;
 	}
@@ -524,13 +524,13 @@ void write_line(void)
 static
 void send_line(void)
 {
-	send_msg("L");
+	console("L");
 	if (*t_lab)
-		send_msg("%s:", t_lab);
-	send_msg("\t%s\t%s\t%s", t_op, t_reg, t_arg);
+		console("%s:", t_lab);
+	console("\t%s\t%s\t%s", t_op, t_reg, t_arg);
 	if (*t_dst)
-		send_msg(",%s", t_dst);
-	send_msg("\n");
+		console(",%s", t_dst);
+	console("\n");
 }
 
 /*
@@ -586,26 +586,6 @@ bool readline(short class)
 	return false;	/* file ends with \1\0 */
 }
 
-global
-short is_lbl(Cstr l)
-{
-	if (l)
-	{
-		short lbl = 0;
-		if (*l   eq  0 ) return  0;			/* no label */
-		if (*l++ ne '_') return -1;
-		if (*l++ ne '_') return -1;
-		if (*l   eq  0 ) return -1;
-		while(*l)
-			if (*l < '0' or *l > '9' )
-				return -1;  /* no compiler generated label */
-			else
-				lbl = (lbl*10)+(*l++-'0');
-		return lbl+1;			/* '__' followed by digits only */
-	}
-	return -1;
-}
-
 static
 AREA *find_area(short id)
 {
@@ -634,10 +614,8 @@ AREA *find_area(short id)
  * Returns nil on end of file.
  */
 
-static
-bool noregs;
 global
-bool new_peep;
+bool nopeep;
 
 static
 BP get_func(short class, short area)
@@ -649,8 +627,7 @@ BP get_func(short class, short area)
 	loclist = 0;
 	regi = nil;
 	loci = nil;
-	noregs = false;
-	new_peep = false;
+	nopeep = false;
 
 	if (saw_eof)
 		return nil;
@@ -693,10 +670,8 @@ BP get_func(short class, short area)
 		char *s = t_dst;
 		while (*s)
 		{
-			if (*s eq 'R') noregs = true;
-			if (*s eq 'r') noregs = false;
-			if (*s eq 'N') new_peep = true;
-			if (*s eq 'n') new_peep = false;
+			if (*s eq 'N') nopeep = true;
+			if (*s eq 'n') nopeep = false;
 			s++;
 		}
 	}
@@ -705,8 +680,8 @@ BP get_func(short class, short area)
 	o_area_setup(TEXT_class, area_id, t_arg);
 
 #if OPTBUG
-	if (G.v_Cverbosity > 2 or G.ad_new_peep or new_peep)
-		send_msg("optimizing '%s'\n", t_arg);
+	if (G.v_Cverbosity > 2 and !(G.ad_nopeep or nopeep) )
+		console("optimizing '%s'\n", t_arg);
 #endif
  	if (cur_proc eq 2)
 		head->bflg.is_global = 1;
@@ -746,7 +721,7 @@ BP get_func(short class, short area)
 static
 bool need_inst(IP ci)
 {
-	if (ci->opcode eq REGL and loclist eq 0)
+	if (ci->opcode eq RGL and loclist eq 0)
 		return false;		/* dont count as a inst */
 
 	if (	(	ci->opcode eq MMS
@@ -915,7 +890,7 @@ void All_inst(BP cp, bool c, Cstr s, ...)
 	IP ip;	/* current instruction */
 	va_list codes;
 	va_start(codes, s);
-	send_msg(">>>> All_inst -= %s =-\n", s);
+	console(">>>> All_inst -= %s =-\n", s);
 
 	while (cp)
 	{
@@ -929,20 +904,20 @@ void All_inst(BP cp, bool c, Cstr s, ...)
 		}
 		cp = c? cp->chain : cp->next;
 	}
-	send_msg("<<<< All_inst end\n\n");
+	console("<<<< All_inst end\n\n");
 }
 
 global
 void All_blocks(BP bp, bool c, Cstr s)
 {
 /*	BP head = bp;
-*/	send_msg(">>>> All_blocks -= %s =-\n", s);
+*/	console(">>>> All_blocks -= %s =-\n", s);
 	while (bp)
 	{
-		send_msg("%s(%d)\n", bp->name, bp->bn);
+		console("%s(%d)\n", bp->name, bp->bn);
 		bp = c ? bp->chain : bp->next;
 	}
-	send_msg("<<<< All_blocks end\n\n");
+	console("<<<< All_blocks end\n\n");
 }
 
 global IP regi, loci;
@@ -1000,10 +975,13 @@ bool do_func(short class, short area)
 	 */
 	bopt(fhead);		/* perform branch optimization always (essential) */
 						/* everything next relies heavily on bopt() */
-	if (!(G.ar_no_registerization or noregs))
+#if !NOPEEP
+	if (!(G.ad_nopeep or nopeep))
+	{
 		setreg(fhead);	/* try to assign locals to registers */
-
-	peep (fhead);	/* peephole optimizations */
+		peep (fhead);	/* peephole optimizations */
+	}
+#endif
 	G.asm_clo = clock();
 #if DBGA2
 	{
@@ -1075,7 +1053,7 @@ bool do_data(short class, short area)
 	while (readline(class))
 	{
 		IP ip;
-		
+
 		ip = addinst(nil, t_op, t_reg, t_arg, t_dst);
 		o_lab(t_lab);
 		if (ip)
@@ -1135,7 +1113,7 @@ bool opc_setup(void)
 		}
 
 #if 0			/* check the spread */
-		send_msg("%d opcodes\n", opc);
+		console("%d opcodes\n", opc);
 		{
 			short i;
 			for (i = 0; i < OPHASH; i++)
@@ -1146,13 +1124,13 @@ bool opc_setup(void)
 					short k = 0;
 					while (ab)
 					{
-						send_msg("%d>%s[%d]\n", k, ab->name, ab->tok);
+						console("%d>%s[%d]\n", k, ab->name, ab->tok);
 						ab = ab->link;
 						k++;
 					}
 				}
 				else
-					send_msg("~~~\n");
+					console("~~~\n");
 			}
 		}
 #endif
@@ -1175,7 +1153,7 @@ ASMOP find_op(char *o)
 	ASM_TAB *ab = IXC_tab[hval];
 	while (ab)
 	{
-		if (strcmp(ab->name, o) eq 0)
+		if (SCMP(303, ab->name, o) eq 0)
 			return ab->tok;
 		ab = ab->link;
 	}

@@ -29,7 +29,6 @@
 #define MNCCUT           23  /* STRING in Baum CMENU */
 #define MNCDEL           24  /* STRING in Baum CMENU */
 #define MNCPASTE         25  /* STRING in Baum CMENU */
-#define MNCUNDO          26  /* STRING in Baum CMENU */
 
 #define TITEL            2   /* Formular/Dialog */
 #define TEXTS            2   /* BOXTEXT in Baum TITEL */
@@ -40,8 +39,6 @@
 #define SH_TYSTR         2   /* TEXT in Baum SH_EDOB */
 #define SH_EDSTR         3   /* FTEXT in Baum SH_EDOB */
 #define SH_COSTR         4   /* FTEXT in Baum SH_EDOB */
-#define SH_NEW           5   /* FTEXT in Baum SH_EDOB */
-#define SH_UPD           6   /* FTEXT in Baum SH_EDOB */
 
 #define FNOP             0   /* Alert String */
 

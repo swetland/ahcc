@@ -21,6 +21,7 @@ calc\sheet.c
 calc\shparse.c			(common/F_x.h)
 
 common\F_x.c			(common/F_x.h)
+common\scr_inst.c
 common\files.c
 common\cursor.c
 common\hierarch.c
@@ -30,7 +31,6 @@ common\wdial.c			; window dialogue handling
 common\stm.c			; chain manager
 common\config.c
 common\parent.s
-common\scr_inst.c
 common\nkcc_c.c
 common\aaaankcc.s		; for the real nkc_tconv
 common\win_menu.c

@@ -26,7 +26,7 @@
 
 #include <stddef.h>
 
-#define MAXCOLS 52   /* WARNING: MAXCOLS*MAXROWS*4 < 32767 !!! */
+#define MAXCOLS 26   /* WARNING: MAXCOLS*MAXROWS*4 < 32767 !!! */
 #define MAXROWS 99
 #define DEFCOLW 12
 #define TOPMARGIN deskw.unit.h
@@ -102,7 +102,7 @@ char * absname(char **, int *, int *, int *);
 char * is_label(char *s, int *ty);
 char * dcol(unsigned short i);
 char * drow(unsigned short i);
-
+void   sh_kolom(struct it *w, int i, bool hide);
 typedef void SHEET_ACT(void *vw, CELLP c);
 
 #define get_cell(w,i,j) (*(w)->wks.tab )[(i)][(j)]

@@ -36,7 +36,7 @@ typedef struct /* Special type for EventMulti */
 	short msgpbuf[8];
 } EVENT;
 
-short G_decl evnt_keybd(void)
+short  evnt_keybd(void)
 {
 	short io;
 	SETACTL(20,0,1,0,0);
@@ -45,7 +45,7 @@ short G_decl evnt_keybd(void)
 	return io;
 }
 
-short G_decl evnt_button(short clks,short mask,short state,
+short  evnt_button(short clks,short mask,short state,
                 short *omx,short *omy,short *but,short *ostate)
 {
 	short ii[3], io[5];
@@ -60,7 +60,7 @@ short G_decl evnt_button(short clks,short mask,short state,
 	return io[0];
 }
 
-short G_decl evnt_mouse(short flags,short mx,short my,short mw,short mh,
+short  evnt_mouse(short flags,short mx,short my,short mw,short mh,
                short *omx,short *omy,short *but,short *ostate)
 {
 	short ii[5],io[5];
@@ -76,7 +76,7 @@ short G_decl evnt_mouse(short flags,short mx,short my,short mw,short mh,
 	return io[0];
 }
 
-short G_decl evnt_mesag(short *msgpipe)
+short  evnt_mesag(short *msgpipe)
 {
 	short io;
 	SETACTL(23,0,1,1,0);
@@ -84,7 +84,7 @@ short G_decl evnt_mesag(short *msgpipe)
 	return io;
 }
 
-short G_decl evnt_timer(short loc, short hic)
+short  evnt_timer(short loc, short hic)
 {
 	short ii[2], io;
 	SETACTL(24,2,1,0,0);
@@ -94,7 +94,7 @@ short G_decl evnt_timer(short loc, short hic)
 	return io;
 }
 
-short G_decl evnt_multi
+short  evnt_multi
 			  (short flags,short clks,short mask,short state,
                short m1flags,short m1x,short m1y,short m1w,short m1h,
                short m2flags,short m2x,short m2y,short m2w,short m2h,
@@ -134,7 +134,7 @@ short G_decl evnt_multi
 	return io[0];
 }
 
-short G_decl EvntMulti(EVENT *event)
+short  EvntMulti(EVENT *event)
 {
 	short *ai = event->msgpbuf;
 	SETACTL(25,16,7,1,0);
@@ -142,7 +142,7 @@ short G_decl EvntMulti(EVENT *event)
 	return event->which;
 }
 
-short G_decl evnt_dclick(short new,short getset)
+short  evnt_dclick(short new,short getset)
 {
 	short ii[2], io;
 	SETACTL(26,2,1,0,0);

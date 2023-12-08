@@ -83,11 +83,17 @@ bool p2_uses(IP ip, ACC reg)
 }
 
 static
-bool same_REGorI(short which, OPND *o, short reg)
+bool same_REGorI(short i, OPND *o, short reg)
 {
+#if AMFIELDS
 	return     o
-	       and o->am eq which
+	       and o->am.i eq i
 	       and o->areg eq reg;
+#else
+	return     o
+	       and o->am eq i
+	       and o->areg eq reg;
+#endif
 }
 
 static
@@ -759,8 +765,8 @@ ipeep2(BP bp, IP i1)
 			{
 				i1->reg = i2->reg;
 				uprefs(i1);
-				PDBG(i1, p2_33);
 				delinst(bp, i2);
+				PDBG(i1, p2_33);
 				return true;
 			}
 		}
@@ -1787,7 +1793,11 @@ ipeep2(BP bp, IP i1)
 		if (    op2 eq ADX
 			and MO(am1) eq REGID
 			and i2->arg
+#if AMFIELDS
+		    and i2->arg->am.i eq REG
+#else
 		    and i2->arg->am eq REG
+#endif
 		    and ISD(i2->arg->areg)
 		    and ISA(i2->reg)
 		    and i2->reg eq reg
@@ -2016,6 +2026,7 @@ ipeep2(BP bp, IP i1)
 				 or arg->disp eq DOT_W
 				 or arg->disp eq DOT_L
 				 or arg->disp eq DOT_D
+				 or arg->disp eq DOT_S
 				 or arg->disp eq DOT_X
 			    )
 			)

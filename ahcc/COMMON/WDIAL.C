@@ -46,6 +46,9 @@
 #include "wdial.h"
 #include "ahcm.h"
 
+static
+short subst_hl = -1;
+
 global
 short edcur = 0;	/* current selected edit field in dialogue */
 
@@ -120,7 +123,7 @@ void wdial_write_cur(IT *w)
 	c[1] = w->dial.edy + 1;
 	c[2] = c[0] + wchar - 2;
 	c[3] = c[1] + hchar - 2;
-	write_curect(w->hl, c);
+	write_curect(w->vhl, c);
 }
 
 global
@@ -334,7 +337,7 @@ bool wdial_watch(IT *w, OBJECT *ob, short nob, short is, short os)
 	if (!mb)		/* If mouse button is already released, assume that was just a click, so select */
 	{
 		this->state = is;
-		draw_ob(ob, nob, w->wa,10);
+		draw_ob(ob, nob, w->wa);
 	othw
 		showm;
 		while (mb)
@@ -357,7 +360,7 @@ bool wdial_watch(IT *w, OBJECT *ob, short nob, short is, short os)
 				{
 					pobf = obf;
 					hidem;
-					draw_ob(ob, nob, w->wa,11);
+					draw_ob(ob, nob, w->wa);
 					showm;
 				}
 			}
@@ -445,7 +448,7 @@ BUTTON wdial_button		/* w,button,kstate,bclicks,mx,my */
 		    	elif (ob->flags & SELECTABLE)
 		    	{
 		    		ob->state = is;
-		    		draw_ob(d->ob, nob, w->wa,12);
+		    		draw_ob(d->ob, nob, w->wa);
 		    	}
 
 		    	exit = true;
@@ -453,7 +456,7 @@ BUTTON wdial_button		/* w,button,kstate,bclicks,mx,my */
 			elif (ob->flags & SELECTABLE)
 			{
 				ob->state = is;
-				draw_ob(d->ob,nob,w->wa,13);
+				draw_ob(d->ob,nob,w->wa);
 
 				if (wdial_watch(w, d->ob, nob, is, os))
 			    {
@@ -475,7 +478,7 @@ BUTTON wdial_button		/* w,button,kstate,bclicks,mx,my */
 	    	}
 
 	    	if (write)
-	    		draw_ob(d->ob, nob, w->wa,14);		/* we know window is on top! */
+	    		draw_ob(d->ob, nob, w->wa);		/* we know window is on top! */
 
 			wdial_on(w);
 		}
@@ -606,7 +609,7 @@ EDIT wdial_edkey			/* 	IT *w,short kcode) */
 			*d->ted->text = 0;
 			wdial_itotmpl(w);
 			hidem;
-			draw_ob(d->ob,d->edob,w->wa,15);
+			draw_ob(d->ob,d->edob,w->wa);
 			showm;
 		}
 		elif (    (k eq NK_DEL or k eq NK_BS)
@@ -616,7 +619,7 @@ EDIT wdial_edkey			/* 	IT *w,short kcode) */
 				 *c = to+1;
 			while ( (*to++ = *c++) ne 0);	/* incl NL */
 			hidem;
-			draw_ob(d->ob,d->edob,w->wa,16);
+			draw_ob(d->ob,d->edob,w->wa);
 			showm;
 		}
 	othw
@@ -629,7 +632,7 @@ EDIT wdial_edkey			/* 	IT *w,short kcode) */
 				*to--=*c--, j--;
 			*d->txt = k;
 			hidem;
-			draw_ob(d->ob,d->edob,w->wa,17);
+			draw_ob(d->ob,d->edob,w->wa);
 			showm;
 			wdial_cursor(w,NK_RIGHT|NKF_FUNC);
 		}
@@ -655,7 +658,7 @@ void wdial_draw(IT *w, short start) /* for draw other redraw events */
 	if (w->op)
 	{
 		GRECT t1;
-		short hl = w->hl;
+		short hl = w->vhl;
 		wind_get(w->wh,WF_FIRSTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
 		while (t1.w and t1.h)
 		{
@@ -663,12 +666,12 @@ void wdial_draw(IT *w, short start) /* for draw other redraw events */
 			{
 				gsclip(hl,1,t1);
 				wdial_off(w);
-				draw_ob(w->dial.ob,start,t1,18);
+				draw_ob(w->dial.ob,start,t1);
 				wdial_on(w);
 			}
 			wind_get(w->wh,WF_NEXTXYWH,&t1.x,&t1.y,&t1.w,&t1.h);
 		}
-		gsclip(hl,1,scr_grect);
+		gsclip(hl,1,screct);
 	}
 }
 
@@ -839,9 +842,6 @@ SIZED wdial_size	/* IT *w, RECT *to	*/
 	if (changed)
 		do_redraw(w,w->wa);
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w,"wdial_size");
-#endif
 }
 
 static
@@ -863,9 +863,6 @@ FULLED wdial_full
 	if (changed)
 		do_redraw(w,w->wa);
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w,"wdial_full");
-#endif
 }
 
 static
@@ -912,9 +909,6 @@ SLIDE wdial_slide
 		}
 	}
 	via (w->winfo)(w);
-#ifdef PRINFO
-	print_it(w, "wdial_slide");
-#endif
 }
 
 static
@@ -1059,11 +1053,13 @@ IT * create_dialw(char *name, short tree, OBJECT *o, short item, WINIT winit, Vp
 					nil,nil,nil,nil,/* no menu in this window */
 					nil,nil,nil,	/* no text selections */
 					wdial_cur,
-					nil, nil, 
+					nil, nil,
 					nil,			/* no specific mouse form */
 					nil,nil,
 					deskw.unit,
+					subst_hl,		/* 07'20 HR v6 */
 					points,
+					0,
 					nil
 				);
 	if (w)
@@ -1087,8 +1083,6 @@ static
 short radio_bgcol;
 #endif
 
-static
-short vdi_handle = -1;
 extern
 short phys_handle,hchar,wchar,points;			/* ex main.c */
 
@@ -1104,16 +1098,16 @@ short phys_handle,hchar,wchar,points;			/* ex main.c */
 static
 void	userdef_text( short x, short y, void *string )
 {
-	vswr_mode( vdi_handle, MD_TRANS );
-	v_gtext( vdi_handle, x, y, string );
-	vswr_mode( vdi_handle, MD_REPLACE );
+	vswr_mode( subst_hl, MD_TRANS );
+	v_gtext( subst_hl, x, y, string );
+	vswr_mode( subst_hl, MD_REPLACE );
 }
 
 static
 void c_clip(GRECT c)
 {
 	if (c.x or c.y or c.w or c.h)	/* PROFIBUCH page 565 */
-		gsclip( vdi_handle, ON, c);
+		gsclip( subst_hl, ON, c);
 }
 
 static
@@ -1137,37 +1131,37 @@ short cdecl check_button( PARMBLK *parmblock )
 	xy[7] = rect[3];
 	xy[8] = rect[0];
 	xy[9] = rect[1];
-	v_pline( vdi_handle, 5, xy );					/* schwarzen Rahmen zeichnen */
+	v_pline( subst_hl, 5, xy );					/* schwarzen Rahmen zeichnen */
 
 	xy[0] = rect[0] + 1;
 	xy[1] = rect[1] + 1;
 	xy[2] = rect[2] - 1;
 	xy[3] = rect[3] - 1;
 
-	vswr_mode( vdi_handle, MD_REPLACE);
-	vr_recfl( vdi_handle, xy );						/* weiže Box zeichnen */
-	vswr_mode( vdi_handle, MD_TRANS);
+	vswr_mode( subst_hl, MD_REPLACE);
+	vr_recfl( subst_hl, xy );						/* weiže Box zeichnen */
+	vswr_mode( subst_hl, MD_TRANS);
 
 	if ( parmblock->currstate & SELECTED )
 	{
 		static char check[2]={8,0};
 		parmblock->currstate &= ~SELECTED;			/* Bit l”schen */
 	#if CHECK_GLYF
-		v_gtext( vdi_handle, rect[0]+wchar/2, rect[1]-1, check);
+		v_gtext( subst_hl, rect[0]+wchar/2, rect[1]-1, check);
 	#else
 		xy[0] = rect[0] + 2;
 		xy[1] = rect[1] + 2;
 		xy[2] = rect[2] - 2;
 		xy[3] = rect[3] - 2;
-		v_pline( vdi_handle, 2, xy );
+		v_pline( subst_hl, 2, xy );
 
 		xy[1] = rect[3] - 2;
 		xy[3] = rect[1] + 2;
-		v_pline( vdi_handle, 2, xy );
+		v_pline( subst_hl, 2, xy );
 	#endif
 	}
 
-	v_gtext(vdi_handle, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text );
+	v_gtext(subst_hl, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text );
 	return( parmblock->currstate );
 }
 
@@ -1189,31 +1183,31 @@ short cdecl radio_button( PARMBLK *parmblock )
 	rect[2] = rect[0] + hchar - 2;
 	rect[3] = rect[1] + hchar - 2;
 
-	v_rbox( vdi_handle, rect );						/* schwarzen Round box zeichnen */
+	v_rbox( subst_hl, rect );						/* schwarzen Round box zeichnen */
 
 	xy[0] = rect[0] + 1;
 	xy[1] = rect[1] + 1;
 	xy[2] = rect[2] - 1;
 	xy[3] = rect[3] - 1;
 
-	vswr_mode( vdi_handle, MD_REPLACE);
-	v_rfbox( vdi_handle, xy );						/* weiže Box zeichnen */
+	vswr_mode( subst_hl, MD_REPLACE);
+	v_rfbox( subst_hl, xy );						/* weiže Box zeichnen */
 
 	if ( parmblock->currstate & SELECTED )
 	{
 		parmblock->currstate &= ~SELECTED;			/* Bit l”schen */
 
-		vsf_color( vdi_handle, 1 );					/* schwarz - fr das button */
+		vsf_color( subst_hl, 1 );					/* schwarz - fr das button */
 		xy[0] = rect[0] + 3;
 		xy[1] = rect[1] + 3;
 		xy[2] = rect[2] - 3;
 		xy[3] = rect[3] - 3;
-		v_rfbox( vdi_handle, xy );
-		vsf_color( vdi_handle, 0 );					/* weiž  */
+		v_rfbox( subst_hl, xy );
+		vsf_color( subst_hl, 0 );					/* weiž  */
 	}
-	vswr_mode( vdi_handle, MD_TRANS);
+	vswr_mode( subst_hl, MD_TRANS);
 
-	v_gtext(vdi_handle, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text);
+	v_gtext(subst_hl, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text);
 
 	return( parmblock->currstate );
 }
@@ -1262,8 +1256,8 @@ short cdecl radio_button( PARMBLK *parmblock )
 	image_colors[0] = 1;			/* schwarz als Vordergrundfarbe */
 	image_colors[1] = radio_bgcol;	/* Hintergrundfarbe */
 
-	vrt_cpyfm( vdi_handle, MD_REPLACE, xy, &src, &des, image_colors );
-	v_gtext(vdi_handle, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text );
+	vrt_cpyfm( subst_hl, MD_REPLACE, xy, &src, &des, image_colors );
+	v_gtext(subst_hl, parmblock->size.x + hchar + wchar, parmblock->size.y, parmblock->P.text );
 
 	return( parmblock->currstate );
 }
@@ -1299,9 +1293,9 @@ short cdecl group( PARMBLK *parmblock )
 	xy[10] = (short) ( xy[0] + strlen( parmblock->P.text ) * wchar );
 	xy[11] = xy[1];
 
-	v_pline( vdi_handle, 6, xy );
+	v_pline( subst_hl, 6, xy );
 
-	v_gtext(vdi_handle, ob[0] + wchar, ob[1], parmblock->P.text );
+	v_gtext(subst_hl, ob[0] + wchar, ob[1], parmblock->P.text );
 
 	return( parmblock->currstate );
 }
@@ -1317,13 +1311,13 @@ short cdecl ob_title( PARMBLK *parmblock )
 	short xy[4];
 	c_clip(parmblock->clip);
 
-	v_gtext(vdi_handle, parmblock->size.x, parmblock->size.y, parmblock->P.text );
+	v_gtext(subst_hl, parmblock->size.x, parmblock->size.y, parmblock->P.text );
 
 	xy[0] = parmblock->size.x;
 	xy[1] = parmblock->size.y + parmblock->size.h;
 	xy[2] = parmblock->size.x + parmblock->size.w - 1;
 	xy[3] = xy[1];
-	v_pline( vdi_handle, 2, xy );
+	v_pline( subst_hl, 2, xy );
 
 	return( parmblock->currstate );
 }
@@ -1390,27 +1384,21 @@ void *subst_objects( OBJECT *obs, bool menu)
 		ublks = xmalloc( no_subs * sizeof( USERBLK ), AH_UBBLK);
 		if ( ublks )		/* Speicher vorhanden? */
 		{
-			USERBLK	*tmp; short i, dum;
-			short wi[12],
-				  wo[57];
+			USERBLK	*tmp; short dum;
 
-			if (vdi_handle < 0)
+			if (subst_hl < 0)
 			{
-				vdi_handle = phys_handle;
-				for(i=0;i<=10;wi[i++]=1);
-				wi[10]=2;
-				v_opnvwk(wi,&vdi_handle,wo);		/* returns in ref handle virtual workstation's handle */
-				if (vdi_handle eq 0)				/* 05'17 HR check */
+				subst_hl = open_vwk(2, "dial", nil, nil);
+				if (subst_hl eq 0)				/* 05'17 HR check */
 					return nil;
-				vst_font( vdi_handle, aes_font );				/* Font einstellen */
-				vst_color( vdi_handle, 1 );						/* schwarz */
-				vst_effects( vdi_handle, 0 );					/* keine Effekte */
-				vst_alignment( vdi_handle, 0, 5, &dum, &dum );	/* an der Zeichenzellenoberkante ausrichten */
-				vst_height( vdi_handle, points, &dum, &dum, &dum, &dum );
-				vsl_type( vdi_handle, 1 );
-				vsl_color( vdi_handle, 1 );
-				vswr_mode( vdi_handle, MD_TRANS );
-				vsf_color( vdi_handle, 0 );					/* weiž  */
+				vst_color( subst_hl, 1 );						/* schwarz */
+				vst_effects( subst_hl, 0 );					/* keine Effekte */
+				vst_alignment( subst_hl, 0, 5, &dum, &dum );	/* an der Zeichenzellenoberkante ausrichten */
+				vst_height( subst_hl, points, &dum, &dum, &dum, &dum );
+				vsl_type( subst_hl, 1 );
+				vsl_color( subst_hl, 1 );
+				vst_font( subst_hl, aes_font );				/* Font einstellen */
+				vswr_mode( subst_hl, MD_TRANS );
 			}
 
 			tmp = ublks;
@@ -1489,6 +1477,7 @@ void *subst_objects( OBJECT *obs, bool menu)
 			}od
 		}
 	}
+
 	return ublks;			/* per tree */
 }
 
@@ -1501,9 +1490,9 @@ void	subst_free( USERBLK *ublks )
 {
 	if ( ublks )		/* Speicher vorhanden? */
 		xfree( ublks );
-	if (vdi_handle > 0)
-		v_clsvwk(vdi_handle),
-		vdi_handle = -1;
+	if (subst_hl > 0)
+		v_clsvwk(subst_hl),
+		subst_hl = -1;
 
 }
 

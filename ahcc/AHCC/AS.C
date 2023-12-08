@@ -114,7 +114,7 @@ short find_asmop(Cstr opc)
 	ab = asm_tab[ophash(o)];
 	while (ab)
 	{
-		if (strcmp(ab->name, o) eq 0)
+		if (SCMP(306, ab->name, o) eq 0)
 			return ab->tok;
 		ab = ab->link;
 	}
@@ -323,7 +323,7 @@ void asm_loop(short delim)
 
 		if (is_line(cur))
 		{
-			if (cur->token eq SELECT)
+			if (cur->token eq SELECTOR)
 			{
 				fadvnode();
 				if (cur->token eq ID)

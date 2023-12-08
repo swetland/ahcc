@@ -69,7 +69,7 @@ TTD_PROF DIS_cfg =
 	false, false, false, 			/* usysv -- tosimg */
 	true, false, false, false, false, false, false, false, false,	 /* vis categories */
 	false, false,		/* wordop, diags */
-	"Digger v8.3+",
+	"Digger v8.4",
 	"t1","t2","t3","t4",
 	".TEXT",
 	".DATA",
@@ -134,13 +134,13 @@ OpEntry ttdtab[]=
 {
 	{ "PROF= {\n",	0,	nil},			/* nil stops recursion */
 
-	{ "titl=%s\n",	TCSL, DIS_cfg.kt[0]		,0,0,0,0},		/* compat, dont write */
+	{ "titl=%s\n",	-TCSL, DIS_cfg.kt[0]	},		/* compat, dont write */
 	{ "tit0=%s\n",	TCSL, DIS_cfg.kt[0]		},
 	{ "tit1=%s\n",	TCSL, DIS_cfg.kt[1]		},
 	{ "tit2=%s\n",	TCSL, DIS_cfg.kt[2]		},
 	{ "tit3=%s\n",	TCSL, DIS_cfg.kt[3]		},
 	{ "tit4=%s\n",	TCSL, DIS_cfg.kt[4]		},
-	
+
 	{ "tbt0=%d\n", 	6,   &DIS_cfg.kb[0]		,KB0,TTD_KIT},
 	{ "tbt1=%d\n", 	6,   &DIS_cfg.kb[1]		,KB1,TTD_KIT},
 	{ "tbt2=%d\n", 	6,   &DIS_cfg.kb[2]		,KB2,TTD_KIT},
@@ -676,8 +676,6 @@ void tree_to_wincfg(KIT_REFS *k, TTD_PROF *w)
 	FTXTGET(longabs);
 	FTXTGET(wordops);
 	set_wordop(w);			/* 11'15 v8.3  */
-	send_msg_n("get wordops %s, %d\n",
-		w->wordops);
 	FTXTGET(labelsep);
 	FTXTGET(copref);
 	FTXTGET(kpref);

@@ -19,16 +19,16 @@
  * Thread safe and debug friendly memory allocator
  */
 
-#ifdef _XA_MEMORY_H
+#ifdef __XA_MEMORY_H
 #pragma if_endfile			/* AHCC: perform #endif and abandon file immediately */
 /* there is also if_endcomp and if_endmake, + the equivalents without if_ */
 #else
-#define _XA_MEMORY_H
+#define __XA_MEMORY_H
 
 #define XA_MAGIC 0xf1e2d3c4
 
 #include <prelude.h>
-#include <stdlib.h>		/* size_t */
+#include <stdlib.h>
 
 #define XA_lib_replace 1
 
@@ -89,7 +89,7 @@ enum
 
 typedef struct xa_memory XA_memory;
 typedef void  XA_report(XA_memory *base, XA_block *blk, XA_unit *unit, char *txt, short nr);
-typedef short XA_run_out(XA_memory *base, XA_key key, XA_key type);
+typedef short XA_run_out(XA_memory *base, XA_key xkey, XA_key xtype);
 
 struct xa_memory
 {
@@ -117,8 +117,8 @@ void 	XA_free_all	(XA_memory *base, XA_key key, XA_key type);
 void	XA_up		(XA_memory *base);
 void *	XA_new		(XA_memory *base, size_t size, XA_key key);
 void	XA_down		(XA_memory *base);
-bool	XA_leaked	(XA_memory *base, XA_key key, XA_key type, XA_report *report, short which);
-void	XA_sanity	(XA_memory *base, XA_report *report, short which);
+bool	XA_leaked	(XA_memory *base, XA_key key, XA_key type, XA_report *report, short nr);
+void	XA_sanity	(XA_memory *base, XA_report *report, short nr);
 void    XA_list_free(XA_memory *base, XA_report *report);
 void *	XA_find		(XA_memory *base, XA_key key, XA_key type);
 bool	XA_present	(XA_memory *base, void *area);

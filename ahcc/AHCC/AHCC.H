@@ -20,21 +20,21 @@
  *	ahcc.h
  */
 
-extern long line_no, n_line_no;
+extern long line_no, n_line_no, bin_size;
 extern Cstr Error,Warning,Message,Comment,W,Fatal;
+
+extern short depth;	/* set and owned by the shell,
+						if no shell, not used. */
 
 short 	main		(short argc, char **argv);
 
-VpI		waitexit, pr_cache;
+VpI		waitexit;
 
 void	error		(Cstr, ...),
 		warn		(Cstr, ...),
-		message		(short, short,         Cstr, ...),
-		errorn		(void *,Cstr, ...),
-		warnn		(void *,Cstr, ...),
-		messagen	(short, short, void *, Cstr, ...),
+		message		(Cstr, ...),
+		errorn		(void *, Cstr, ...),
+		warnn		(void *, Cstr, ...),
+		messagen	(void *, Cstr, ...),
 		send_incname(short, Cstr incname);
 
-Cstr	pluralis	(short n);		/* actually in aaaa_lib.c */
-
-void check_cache(short which, const char *s);

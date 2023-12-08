@@ -99,8 +99,9 @@ char *GemDos[] =
 	"330", "331", "332", "333", "PsetreUid",
 	"PsetreGid", "Sync", "Shutdown", "Dreadlabel", "Dwritelabel",
 	"Ssystem", "Tgettimeofday", "Tsettimeofday", "343", "Pgetpriority",
-	"Psetpriority", "346"
-},
+	"Psetpriority",
+
+	/* MiNTNet */ /* 12'17 v8.4 (Thanks to Gerhard Stoll) */    "Fpoll", "Fwritev", "Freadv", "Ffstat64", "Psysctl", "Pemulation",    "Fsocket", "Fsocketpair", "Faccept", "Fconnect", "Fbind", "Flisten",    "Frecvmsg", "Fsendmsg", "Frecvfrom", "Fsendto", "Fsetsockopt",    "Fgetsockopt", "Fgetpeername", "Fgetsockname", "Fshutdown", "367",    "Pshmget", "Pshmctl", "Pshmat", "Pshmdt", "Psemget", "Psemctl", "Psemop",    "Psemconfig", "Pmsgget", "Pmsgctl", "Pmsgsnd", "Pmsgrcv", "380",    "Maccess", "382", "382", "Fchown16", "Fchdir", "Ffdopendir", "Fdirfd", "388"},
 	*Bios[] =
 {
 	"Getmpb", "Bconstat", "Bconin", "Bconout",
@@ -140,10 +141,12 @@ char *GemDos[] =
 	"sndstatus", "buffptr"
 };
 
-#define gemdosses (sizeof(GemDos)/sizeof(char *))
-#define xbiosses  (sizeof(Xbios )/sizeof(char *))
-#define mintstart 255
-#define mintend   345
+#define ChSz sizeof(char *)
+#define mintstart  255
+#define gemdosses (sizeof(GemDos)/ChSz)
+#define xbiosses  (sizeof(Xbios )/ChSz)
+#define mints     (sizeof(MinT  )/ChSz)
+#define mintend   (mints + mintstart)
 
 typedef
 bool AM(short mr);
@@ -1405,9 +1408,8 @@ void trap_id(DW *dw, uint *pc, uint i)
 			colon_4(dw, "StarTrack");
 		elif (i eq 555)
 			colon_4(dw, "Trapper");
-/* --------------------------------------------------- */
 
-}
+/* 12'17 v8.4  (Thanks to Gerhard Stoll) */		elif (i eq 0xc6a)			colon_4(dw, "Read Core temp.");		elif (i eq 0xc6b)			colon_4(dw, "CT RW Parameter");		elif (i eq 0xc6c)			colon_4(dw, "CT Cache");		elif (i eq 0xc6d)			colon_4(dw, "CT Flush Cache");}
 
 extern short tabgain, tabgain1;
 

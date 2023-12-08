@@ -113,7 +113,6 @@ typedef union
 	  ubits
 		free	: 1,		/* node is on free list				*/
 		nexp	: 1,		/* dont expand						*/
-		Xp      : 1,		/* part of expansion				*/
 		spar	: 1,		/* for DPARAM node's	(#param)	*/
 		lcat	: 1,		/* left of ##						*/
 		rcat	: 1,		/* right of ##						*/
@@ -130,7 +129,7 @@ typedef union
 #endif
 		nheap	: 1,		/* Name is malloc'd, must be free'd */
 							/* otherwise is absent or in dictionary */
-		b14_15  : 2;
+		b14_b15	: 2;
 	} f;
 	ushort i;
 } NFLAGS;
@@ -177,6 +176,7 @@ typedef union
 		formal    : 1,		/* Array declaration is formal (empty [])			*/
 		saw_array : 1,		/* genuine []'d array seen but converted to pointer */
 		old_args  : 1,		/* old style function declaration	*/
+		o_s_conv  : 1,		/* 11'19 HR v6: converted to ansi */
 		ans_args  : 1,		/* ANSI prototype					*/
 		asm_func  : 1,		/* declaration of embedded assembly */
 		saw_proc  : 1,		/* proc --> &proc */
@@ -190,9 +190,9 @@ typedef union
 		used      : 1,
 		inid      : 1,
 #else
-		b11_13    : 3,
+		b12_13    : 2,
 #endif
-		b14_15    : 1;
+		dflt      : 1;		/* 07'19 HR: v6 type is default (empty declarer) */
 	} f;
 	ushort i;
 } TFLAGS;
@@ -205,8 +205,6 @@ typedef union
 		undef   : 1,		/* Name is undefined */
 		see_reg : 1,		/* register declaration */
 		is_arg  : 1,		/* object in function is argument */
-		cdec    : 1,		/* cdecl function 	*/
-		sysc    : 1,		/* __syscall__ */
 		rlop    : 1,		/* floating point monadyc operator */
 	  	cfop	: 1,		/*   idem  on Coldfire */
 		ided    : 1,		/* prevent from matching again */
@@ -216,11 +214,27 @@ typedef union
 		qc      : 1,
 		qv      : 1,		/* qualifications */
 		q 		: 1,		/* qualified */
-		inl_v   : 1,		/* inlined single value (like Pure C) */
-		asm_f   : 1;
+		cp		: 1,		/* 07'19 HR: v6 flag for Pure C style offsetof. */
+		of		: 1;		/* 09'19 HR: v6 flag for offsetof. (see __O__ ) */
+		b14_15 	: 2;
 	} f;
 	ushort i;
 } CFLAGS;
+
+typedef union
+{
+	struct
+	{
+	  ubits
+		cdec    : 1,		/* cdecl function 	*/
+		sysc    : 1,		/* __syscall__ */
+		pasc	: 1,		/* pascal function	*/
+		inl_v   : 1,		/* inlined single value (like Pure C) */
+		asm_f   : 1,		/* __asm__ (assembler) function body */
+		b5_15   : 11;
+	} f;
+	ushort i;
+} XFLAGS;		/* 09'19 HR: v6 needs more flags :-/ */
 
 enum
 {
@@ -237,8 +251,7 @@ typedef union
 		lproc : 1,		/* Local procedure */
 		ns    : 1,		/* name contexts ns: string$, no context or np int32, nf float~ */
 		np    : 1,
-		nf    : 1,
-	    b5_15 : 11;
+		nf    : 1;
 	} f;
 	ushort i;
 } AFLAGS;
@@ -263,21 +276,22 @@ typedef struct
 	long ln;
 } FINFO;
 
+/* 09'19 HR: v6 needed more flags :-/ :: XFLAGS */
 #if C_DEBUG
 #define NODECOMMON(a,b,c,d)\
 	struct a *b,*c; \
 	Cstr 	name;	\
-	NFLAGS nflgs;	\
-	uchar nt, sc;   \
-	ulong diags;    \
-	short d;
+	NFLAGS	nflgs;	\
+	uchar	nt, sc; \
+	ulong	diags;  \
+	short	d;
 #else
 #define NODECOMMON(a,b,c,d)\
 	struct a *b,*c; \
 	Cstr 	name;	\
-	NFLAGS nflgs;	\
-	uchar nt, sc;   \
-	short d;
+	NFLAGS	nflgs;	\
+	uchar	nt, sc; \
+	short	d;
 #endif
 
 /* smallest node,  same as vnode upto node data (nd) */
@@ -315,6 +329,8 @@ typedef struct xnode
 
 /*  ---------------- */
 	CFLAGS	cflgs;
+	XFLAGS	xflgs;
+	short xxx;
 	EFLAGS	zflgs;
 	STR_SZ
 	ushort	cat0;
@@ -352,6 +368,8 @@ typedef struct tlnode
 
 /*  ------------ */
 	CFLAGS	cflgs;
+	XFLAGS	xflgs;
+	short xxx;
 	TFLAGS	tflgs;
 	STR_SZ
 	ushort	cat0;
@@ -389,6 +407,8 @@ typedef struct exnode			/* enode & gnode amalgamated */
 
 /*  ------------ */
 	CFLAGS	cflgs;		/* must be same place as tnode	*/
+	XFLAGS	xflgs;
+	short xxx;
 	EFLAGS	eflgs;
 	STR_SZ
 	ushort	cat0;

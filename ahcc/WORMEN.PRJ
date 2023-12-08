@@ -6,7 +6,7 @@ wormen\wormen.prg
 pcvstart.o
 wormen\worms.c
 common\scr_inst.c
-common\aaaankcc.s
+common\xa_nkcc.s
 common\aaaa_lib.c
 
 pc881lib.lib

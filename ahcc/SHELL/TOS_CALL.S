@@ -20,13 +20,12 @@
 
 *	Turns the characterstring commandline
 *	into an array of pointers to individual arguments
-*	H. Robbers Amsterdam
 
 	.data
 _module:
 	.dc.l	1
 _stackp:
-       .dc.l   1
+	.dc.l   1
 
 EmpStr:
 	.dc.b    0
@@ -52,7 +51,6 @@ lo:
 
 * scan commandline
 
-
 l0:								; MAIN 2 legged loop
 	cmpa.l  a0, a1
 	ble 	lx
@@ -77,7 +75,6 @@ l2:								; SPACE loop
 	addq.l	#1,d1				; argc
 	clr.b	(a1)				; clear space
 	bra 	l0
-
 
 apo:							; APOSTROPHE loop
 	clr.b	(a1)				; clear  apostrophe

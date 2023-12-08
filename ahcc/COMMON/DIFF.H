@@ -19,15 +19,20 @@ static void select_2(IT *w1, IT *w2, STMC *s1, STMC *s2)
 	select_line(w2,l2-1);
 }
 
-static void next_2(IT *wl, IT *wr, STMC **pls, STMC **prs, STMNR *pli, STMNR *pri)
+static STMC * next_nemp(IT *w)		/* 12'17 HR */
 {
-	STMC *ls, *rs;
-	ls = stmfinext(wl->base);
-	rs = stmfinext(wr->base);
-	*pli = ls->xn;
-	*pri = rs->xn;
-	*pls = ls;
-	*prs = rs;
+	STMC *s = stmficur(w->base);
+	do
+	{
+		if (!s)
+			break;
+		if (s->x_l) break;
+		/* discard empty line */
+		s = stmfinext(w->base);
+	}
+	od;
+
+	return s;
 }
 
 short tel;
@@ -45,19 +50,19 @@ short line_compare(char *s, STMC *s1, STMC *s2, bool vs)
 			char t1[MAXL+1], t2[MAXL+1];
 			l1 = handle_space(t1, s1->xtx);
 			l2 = handle_space(t2, s2->xtx);
-			
+
 			if (l1 ne l2)
 				ceq = 2;
 			if (l1)
-				ceq =  strcmp(t1, t2);
+				ceq =  SCMP(20, t1, t2);
 #if DBGC
 			alert_text("%s %ld %s %ld | '%s' | '%s'", s, s1->xn, ceq ? "!=" : "==", s2->xn, t1, t2);
 #endif
 		othw
-			if (s1->xl ne s2->xl)
+			if (s1->x_l ne s2->x_l)
 				ceq = 2;
-			if (s1->xl)
-				ceq = strncmp(s1->xtx,s2->xtx,s1->xl);
+			if (s1->x_l)
+				ceq = strncmp(s1->xtx,s2->xtx,s1->x_l);
 		}
 	}
 
@@ -70,8 +75,9 @@ void show_lines(char *s, IT *w1, IT *w2)
 	STMC *s2 = stmficur(w2->base);
 
 	if (s1 and s2)
-	 	console("-= %s =- L1:%ld L2:%ld\n", s, s1->xn, s2->xn);
+	 	send_msg("-= %s =- L1:%ld L2:%ld\n", s, s1->xn, s2->xn);
 }
+
 static void disp_diff(IT *wl, IT *wr, STMNR li, STMNR lj, STMNR ri, STMNR rj)
 {
 	STMNR i;
@@ -94,7 +100,7 @@ static void disp_diff(IT *wl, IT *wr, STMNR li, STMNR lj, STMNR ri, STMNR rj)
 			STMC *s = find_line(wr, i-1);
 			pr("+", s->xn, s);
 			i++;
-		}		
+		}
 	}
 
 	send_msg("\n");
@@ -106,7 +112,7 @@ static bool line_eq(IT *wl, IT *wr, STMNR li, STMNR ri, bool zpm)
 {
 	STMC *ls = find_line(wl, li-1);
 	STMC *rs = find_line(wr, ri-1);
-	
+
 	if (ls and rs)
 		return line_compare("line_eq:", ls, rs, zpm) eq 0;
 
@@ -141,7 +147,7 @@ static void still_diff(IT* wl, IT *wr, STMNR li, STMNR lm, STMNR ri, STMNR rm, s
 			if (lx > lm or rx > rm) break;				/* Exit If (Lj%+I%) > Lm% Exit If (Rj%+I%) > Rm% */
 			match = line_eq(wl, wr, lx, rx, zpm);
 			i++;
-		}	
+		}
 
 		if (match)
 			break;
@@ -170,13 +176,13 @@ static void still_diff(IT* wl, IT *wr, STMNR li, STMNR lm, STMNR ri, STMNR rm, s
 				reob = true;
 				rjmax = rm;
 				ljmin = *lj + 1;
-				
+
 			}
 
 			*rj += 1;
 			if (*rj > rm)
 				*rj = rjmin;
-			
+
 			*lj = ljmin;
 		}
 		if (leob and reob)
@@ -210,8 +216,12 @@ static void lines_eq(
 	short c = 0;
 	while (sl and sr)
 	{
+/* 12'17 HR discard empty lines :-) */		sl = next_nemp(wl);	
+		sr = next_nemp(wr);
+
 		if (line_compare("lines_eq:", sl, sr, zpm) ne 0)
 			break;
+
 		sl = stmfinext(wl->base);
 		sr = stmfinext(wr->base);
 		c++;
@@ -243,14 +253,14 @@ static void lines_ne(IT *wl, IT *wr, STMNR li, STMNR lm, STMNR ri, STMNR rm, STM
 static STMNR prepare(IT *w, STMC **s, STMNR *high)
 {
 	STMC *sl, *cur; STMNR i;
-	
+
 	sl = stmfilast(w->base);
 	if (high)
 		*high = sl ? sl->xn : 1;
-	via (w->deselect)(w, LOW);	/* if already found unequal, will find next */	
+	via (w->deselect)(w, LOW);	/* if already found unequal, will find next */
 	cur = find_line(w, w->cu.pos.y);	/* start on current cursor positions */
 	i = cur ? cur->xn : 1;
-	
+
 	if (sl)
 		if (i >= sl->xn)
 		{

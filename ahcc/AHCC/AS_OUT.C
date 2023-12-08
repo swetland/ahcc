@@ -144,6 +144,7 @@ w_A W_ds
 	o_DS(ip);
 }
 
+#if BIP_ASM
 static
 void check_minus(NP np, NP lp, NP rp)
 {
@@ -167,6 +168,7 @@ void check_minus(NP np, NP lp, NP rp)
 		advance_l(np->val.i);
 	}
 }
+#endif
 
 static
 void write_dc(NP np, short sz)
@@ -174,9 +176,12 @@ void write_dc(NP np, short sz)
 	NP lp = np->left,
 	   rp = np->right;
 
+#if BIP_ASM
 	if (np->token eq MINUS)
 		check_minus(np,lp,rp);
-	elif (np->token eq COMMA)
+	else
+#endif
+	if (np->token eq COMMA)
 	{
 		write_dc(lp, sz);
 		write_dc(rp, sz);

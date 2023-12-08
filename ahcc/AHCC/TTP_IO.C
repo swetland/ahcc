@@ -55,7 +55,7 @@ global short close_S(FILE *fd)
 	return 0;
 }
 
-void send_msg(Cstr text, ...)
+void send_msg(char *text, ...)
 {
 	va_list argpoint;
 	va_start(argpoint, text);

@@ -76,6 +76,8 @@
 #include "pre.h"
 #include "tok.h"
 
+const char * pluralis(short);
+
 #define ONE_ERROR 0
 
 #if FLOAT
@@ -243,7 +245,7 @@ long tok_oct(LEX_RECORD *r)
 			val = (val<<3)+(*s++ - DIGITNAUGHT);
 		else
 		{
-			error("illegal octal digit in '%s'", r->text);
+			error("Illegal octal digit in '%s'", r->text);
 			return 0;
 		}
 
@@ -263,7 +265,7 @@ __ll tok_octll(LEX_RECORD *r)
 			ushort c = (uchar)*s++ - DIGITNAUGHT;
 			val = _ullsmul(val, 8, c);		/* c is added to the result */
 		othw
-			error("illegal octal digit in '%s'", r->text);
+			error("Illegal octal digit in '%s'", r->text);
 			val.hi = 0;
 			val.lo = 0;
 		}
@@ -471,8 +473,6 @@ LEX	*ow_lex[256];
 
 char graphemp[] = "???";
 
-short alert_text(char *, ...);
-
 static
 void mo_init(void)
 {
@@ -501,7 +501,7 @@ alert_text(" LASTTOK %d | size of tok_tab | %ld/%ld = %ld", LASTTOK, sizeof(tok_
 			dup_tok[tok] = &dup_tab[tok-FIRST_OP];
 #endif
 		}
-		if (strcmp(graphic[tok], graphemp) eq 0)
+		if (SCMP(70,graphic[tok], graphemp) eq 0)
 		{
 			graphic[tok] = pt->text;
 			  C_tok[tok]->text = pt->text;
@@ -610,10 +610,9 @@ void node_from_op(XP tp, LEX *kp)
 }
 
 static
-void to_id(XP tp, short which)			/* then library software or ID */
+void to_id(XP tp)			/* then library software or ID */
 {
-/*	message(0, 1, "[%d]to_id %s", which, prtok(tp));
-*/	tp->token   = ID;
+	tp->token   = ID;
 	tp->cflgs.i = 0;
 	tp->cat0    = 0;
 	tp->cat1    = 0;
@@ -787,7 +786,7 @@ LEX *find_kw(Cstr s, LEX *lex[], short flag)
 		{
 			if ((tok_tab[kp->value-FIRST_OP].flags&flag) eq 0)
 			{
-				short i = strcmp(s, kp->text);
+				short i = SCMP(71,s, kp->text);
 				if (i eq 0) return kp;
 				if (i <  0) return nil;
 			}
@@ -808,7 +807,7 @@ void kw_tok(XP tp)			/* NB!!!!! after macro expansion */
 		take(tp, tok, kp);
 		/* The only one needed after macro expansion */
 		if (!G.use_FPU and tp->cflgs.f.rlop)
-			to_id(tp, 3);
+			to_id(tp);
 	}
 }
 
@@ -1057,7 +1056,7 @@ void make_id(XP xp, short flag0, short flag1)
 	{
 		if (xp->cat0&flag0)
 		{
-			to_id(xp, 1);
+			to_id(xp);
 			return;
 		}
 	}
@@ -1072,7 +1071,7 @@ void make_id(XP xp, short flag0, short flag1)
 				short cat = (tk->cat0&XC) ? tok->cx : tk->cat1;
 
 				if (cat&flag1)
-					to_id(xp, 3);
+					to_id(xp);
 			}
 		}
 	}
@@ -1088,7 +1087,7 @@ short check_tab(TOKEN *i, TOKEN *o, long l)
 	{
 		if (i->text ne o->text)
 			if (i->text ne 0 and o->text ne 0)
-				if (strcmp(i->text, o->text) ne 0)
+				if (SCMP(72,i->text, o->text) ne 0)
 					return 1;
 		if (i->cat0 ne o->cat0)
 			return 2;
@@ -1164,7 +1163,7 @@ short tok_next(void)
 	{
 		short i = check_tab(tok_tab, dup_tab, sizeof(tok_tab)/sizeof(TOKEN));
 		if (i)
-			message(0, 1, "CORRUPTION %s @ %d r=%d", prtok(curtok), i);
+			message("CORRUPTION %s @ %d r=%d", prtok(curtok), i);
 	}
 #endif
 

@@ -38,7 +38,7 @@ VpN		chkcmp,
 
 void	cast_up(NP, TP, char *);
 
-NpN 	arg_regs;
+NpN  arg_regs;
 
 VpNN	castasn,
 		castasop,
@@ -54,14 +54,15 @@ IpN		icon_ty;
 bool	is_CC(void *),
 		const_check	(NP lp, short context);
 
-BpN		external_unary_op,
-		external_cast,
-		external_binary_op,
-		mustlval,
-		is_zero;
+BpN		u_overload,
+		b_overload,
+		c_overload,
+		is_zero,
+		mustlval;
 
-BpNI	mustty, must2ty;
-
+BpNI	must2ty;
+		
+BpNII	mustty;
 TpTI	yields_ty;
 
 TpNTI	hardasmagic;

@@ -29,10 +29,14 @@
 #include "qmem.h"
 #include "dict.h"
 
-globalMEMBASE dictionary_mem;
-globalshort numhash = NHASHD;
-globallong dictionary_names = 0, heap_names = 0;
-globalvoid *dictionary[NHASHD];
+global
+MEMBASE dictionary_mem;
+global
+short numhash = NHASHD;
+global
+long dictionary_names = 0, heap_names = 0;
+global
+void *dictionary[NHASHD];
 
 global
 short dichash(Cstr key)
@@ -49,7 +53,8 @@ short dichash(Cstr key)
 /* Get the dictionary entry for the identifier named key.
    Create one if there is none.  */
 
-#define LMX 31
+void
+send_msg(char *text, ...);
 
 global
 Cstr to_dictionary(Cstr key)	/* for ID's only */
@@ -59,7 +64,6 @@ Cstr to_dictionary(Cstr key)	/* for ID's only */
 
 	/* Determine the proper bucket.  */
 
-
 	hashval = dichash(key);
 
 	/* Search the bucket.  */
@@ -67,14 +71,16 @@ Cstr to_dictionary(Cstr key)	/* for ID's only */
 	bp = dictionary[hashval];
 	while (bp)
 	{
-		if (strcmp (key, bp->name) eq 0)
+		if (SCMP(50, key, bp->name) eq 0)
 			return bp->name;
 		bp = bp->link;
 	}
 
+
 	/* Nothing was found; create a new dictionary entry.  */
 
 	bp = qalloc(&dictionary_mem, sizeof(DIC) + strlen(key) + 1);
+
 	if (bp)
 	{
 		strcpy ((char *)bp->name, key);

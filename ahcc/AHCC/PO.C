@@ -397,8 +397,36 @@ o_A o_UDVX
 		o_arith (ip, 0100300, 040, IN_X, false);
 }
 
-o_A o_MDX  { o_DVX (ip); }
-o_A o_UMDX { o_UDVX(ip); }
+o_A o_MDX 
+{
+#if COLDFIRE || FLOAT
+	if (    ip->sz eq DOT_L
+	#if FLOAT
+	    and !is_f(ip)
+	#endif
+	   )
+		o_Lmd(ip, 0046100, 2, 1);
+	else
+#endif
+	{
+/*		console("o_arith for mdx\n");
+*/		o_arith (ip, 0100700, 041, IN_X, false);
+	}
+}
+
+o_A o_UMDX
+{
+#if COLDFIRE || FLOAT
+	if (    ip->sz eq DOT_L
+	#if FLOAT
+	    and !is_f(ip)
+	#endif
+	   )
+		o_Lmd(ip, 0046100, 0, 1);
+	else
+#endif
+		o_arith (ip, 0100300, 041, IN_X, false);
+}
 
 #if COLDFIRE || FLOAT
 o_A o_RMX { o_Lmd(ip, 0046100, 2, 0); }
@@ -1286,7 +1314,7 @@ o_A o_DC
 				s = s_xtol(s, &v);
 				advance_l(v);
 			}
-			elif (sz eq DOT_LL)		/* also good for DOT_D */
+			elif (sz eq DOT_D)	/* also good for DOT_ll if there */
 			{
 				Cstr s = op->astr + 1;
 				s = s_xtol(s, &v);
@@ -1405,7 +1433,7 @@ o_A o_BEGIN { }
 o_A o_LIV{ }
 o_A o_END{ }
 o_A o_LOOP{ }
-o_A o_REGL{ }
+o_A o_RGL{ }
 o_A o_LOC{ }
 o_A o_RGD{ }
 o_A o_RGA{ }

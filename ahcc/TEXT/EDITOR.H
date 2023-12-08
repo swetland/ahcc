@@ -43,4 +43,20 @@ VpV		open_buf;
 FCLOSE	deletebuf;
 void 	do_repl			(IT *w);
 bool 	replace			(IT *w, Cstr with, short l);
-void	insert_fkey		(IT *w, short which);
+void	insert_fkey		(IT *w, short i);
+STMC *	copy_1			(STMDEF *to,STMC *s,short f,short l,STMACC acc);
+short	_del_			(IT *w, CINF ds, CINF de);
+bool	catenate		(IT *w,STMDEF *m,STMC *s,short avrg);
+bool	del_ch			(IT *w,STMC *s,short f,short i);
+void	to_undo			(IT *w,STMC *s);
+bool	insert			(IT *w,STMC *s,short f,short i,short code,short avrg);
+bool	split			(IT *w,STMC *s,short f,short avrg);
+bool	delete			(IT *w);
+
+extern
+STMDEF shunt;					/* copy paste buffer */
+
+#ifdef MNUNDO
+extern
+STMDEF oldshunt;				/* and its undo buffer */
+#endif

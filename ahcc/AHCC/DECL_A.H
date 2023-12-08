@@ -119,9 +119,9 @@ TP Declare_A(TP e1, TP head)
 			rep_tdef(head, e1, STR, T_STRING);
 /*		elif (e1->aflgs.f.np)
 			rep_tdef(head, e1, CAR, T_INT);
-*/		elif (e1->aflgs.f.nf)
+		elif (e1->aflgs.f.nf)
 			rep_tdef(head, e1, FLO, T_REAL);
-		elif (head->token eq T_DEF)
+*/		elif (head->token eq T_DEF)
 			rep_tdef(head, e1, 0, T_INT);
 	}
 

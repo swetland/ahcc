@@ -30,6 +30,8 @@
 #include "param.h"
 #include "common/mallocs.h"
 
+const char * pluralis(short);
+
 #undef prior
 #undef next
 
@@ -41,6 +43,10 @@
 #else
 #define NL
 #endif
+
+global
+long bin_size;
+
 
 static
 short result = 0;
@@ -60,9 +66,9 @@ char *fixnames[]=
 	"*24*", "*25*", "*26*", "*27*", "*28*", "*29*", "*30*", "*31*"
 };
 
-static void newl   (void)           { send_msg("\n");                               }
-static void barrier(void)           { send_msg("================================\n"); }
-static void l9     (long l, Cstr s) { send_msg(" %9ld %s\n", l, s ? s : "");        }
+static void newl   (void)           { console("\n");                               }
+static void barrier(void)           { console("================================\n"); }
+static void l9     (long l, Cstr s) { console(" %9ld %s\n", l, s ? s : "");        }
 
 
 #define SPM 32
@@ -73,17 +79,17 @@ void sp(short n)
 	if (n > SPM) n = SPM;
 	while (n-- > 0) *s++ = ' ';
 	*s = 0;
-	send_msg(spaces);
+	console(spaces);
 }
 
 static
 void byli(long b, long l)
 {
-	send_msg(" bytes\t:"); l9(b, nil);
-	send_msg(" lines\t:"); l9(l, nil);
+	console(" bytes\t:"); l9(b, nil);
+	console(" lines\t:"); l9(l, nil);
 
 	if (l)
-	send_msg("\t\t="); l9(b/l, "bytes/line");
+	console("\t\t="); l9(b/l, "bytes/line");
 }
 
 static
@@ -92,7 +98,7 @@ void adl(short l, char c)
 	char ss[12], *s = ss;
 	while (l--) *s++ = c;
 	*s = 0;
-	send_msg(" %s +\n", ss);
+	console(" %s +\n", ss);
 }
 
 static
@@ -103,10 +109,11 @@ void pl(Cstr wc, Cstr wh, long c, long h)
 	      lh = strlen(wh),
 	      ss = lc > lh ? lc : lh;
 
-	send_msg(" %*s:", ss, wc); l9(c, nil);
-	send_msg(" %*s:", ss, wh); l9(h, nil);
+	console(" %*s:", ss, wc); l9(c, nil);
+	console(" %*s:", ss, wh); l9(h, nil);
 	sp(ss+2); adl(9, '-');
 	sp(ss+2); l9(c + h, nil);
+	newl();
 }
 
 global
@@ -121,17 +128,21 @@ void pr_stats(void)
 {
 	long cmins, csecs, secs, cobytes, colines;
 
+	depth = 0;
+
 	NL;
-	send_msg("\n'Make all' statistics\n");
+	newl();
+	console("'Make all' statistics\n");
 	barrier();
-	send_msg("Project:\n");
+	console("Project:\n");
 	byli(stats.bytes, stats.lines);
 
 	cobytes = stats.cbytes + stats.hbytes;
 	colines = stats.clines + stats.hlines;
 
 	NL;
-	send_msg("\nCompiled:\n");
+	newl();
+	console("Compiled:\n");
 	pl("input  ", "headers", stats.I, stats.H);
 
 	NL;
@@ -142,12 +153,12 @@ void pr_stats(void)
 	if (stats.I or stats.H)
 	{
 		if (stats.I)
-			send_msg(" bytes /  input  :"); l9(stats.cbytes/stats.I, nil);
+			console(" bytes /  input  :"); l9(stats.cbytes/stats.I, nil);
 		if (stats.H)
-			send_msg(" bytes /  header :"); l9(stats.hbytes/stats.H, nil);
+			console(" bytes /  header :"); l9(stats.hbytes/stats.H, nil);
 	}
 
-	newl();
+	NL;
 	pl("lines in input  ", "lines in headers", stats.clines, stats.hlines);
 
 	stats.limit = clock()/2;
@@ -158,11 +169,11 @@ void pr_stats(void)
 	secs  = csecs%60;
 
 	NL;
-	send_msg(" time   : %4ld'%02ld\" (%ld second%s)\n", cmins, secs, csecs, pluralis(csecs) );
+	console(" time   : %4ld' %02ld\" (%ld second%s)\n", cmins, secs, csecs, pluralis(csecs) );
 
 	if (csecs)
 	{
-		sp(8); send_msg("="); l9(stats.cbytes/csecs, "bytes/second");
+		sp(8); console("="); l9(stats.cbytes/csecs, "bytes/second");
 		sp(9);                l9(stats.clines/csecs, "lines/second");
 	}
 
@@ -279,7 +290,7 @@ char * fixup_name(short ty)
 global
 void disp_fix(FIXUP *f, short level, char *out)
 {
-	send_msg("%d>fixup %s %3d, FIX(%3d,%3d,%3d) %4ld, @ %6ld %6ld [%3d]%s\n",
+	console("%d>fixup %s %3d, FIX(%3d,%3d,%3d) %4ld, @ %6ld %6ld [%3d]%s\n",
 			level,
 			fixup_name(f->fix.ty),
 			f->target,
@@ -354,19 +365,19 @@ void list_refs(REFS *rf, bool in)
 		}
 
 #if P_VERBOSE
-		send_msg("%6ld + %6ld\t", f->in->out, f->disp);
+		console("%6ld + %6ld\t", f->in->out, f->disp);
 		if (is_module(f->fix.ty) or *f->in->name eq 0)
-			send_msg("%s %s nd %d %s %s\n",
+			console("%s %s nd %d %s %s\n",
 				fixup_name(f->fix.ty), f->name->s, f->name->nr, intx, flname);
 		else
-			send_msg("%s %-32s nd %d in '%s' %s %s\n",
+			console("%s %-32s nd %d in '%s' %s %s\n",
 				fixup_name(f->fix.ty), f->name->s, f->name->nr, f->in->name, intx, flname);
 #else
 		if (is_module(f->fix.ty) or *f->in->name eq 0 or *f->in->name eq '~' or is_tmplab(f))
-			send_msg("%-18s %s%-18s\n",
+			console("%-18s %s%-18s\n",
 				f->name->s, intx, flname);
 		else
-			send_msg("%-18s in %-18s %s%-18s\n",
+			console("%-18s in %-18s %s%-18s\n",
 				f->name->s, f->in->name, intx, flname);
 #endif
 		rf = rf->next;
@@ -383,7 +394,7 @@ void disp_area(AREA *new, bool out, short level)
 		if (*n eq '~' and *(n+1) eq '_')
 			n = "";
 #endif
-		send_msg("%d>area at %6ld [%6ld]  %s %s\n",
+		console("%d>area at %6ld [%6ld]  %s %s\n",
 				level,
 				new->out,
 				new->limage,
@@ -392,7 +403,7 @@ void disp_area(AREA *new, bool out, short level)
 				);
 	}
 	else
-		send_msg("%d>%s area at %08lx [%6ld]  %s %s\n",
+		console("%d>%s area at %08lx [%6ld]  %s %s\n",
 				level,
 				new->referenced ? "referenced" : "          ",
 				new->image,
@@ -499,16 +510,16 @@ VpV list_flist
 	FILEBASE *fb = &P.fbase;
 	FLIST *this = fb->first;
 
-	send_msg("****  list of %s\n", fb->name);
+	console("****  list of %s\n", fb->name);
 
 	while (this)
 	{
 		Cstr s = this->name;
-		send_msg("%s\n", s);
+		console("%s\n", s);
 		this = this->next;
 	}
 
-	send_msg("****\n");
+	console("****\n");
 }
 
 void
@@ -782,7 +793,7 @@ char * add_fixups(char **to, long *count)
 	*count = nf * sizeof(FIX);
 
 #if P_VERBOSE
-	send_msg("\n%ld fixups\n\n", nf);
+	console("\n%ld fixups\n\n", nf);
 #endif
 
 	return *to + nf * sizeof(FIXUP);
@@ -795,14 +806,14 @@ char * add_names(char **to, long *count)
 	FLIST *fl = P.fbase.first;
 
 #if P_VERBOSE
-	send_msg("**** Names ****\n\n");
+	console("**** Names ****\n\n");
 #endif
 
 	while (fl)
 	{
 		PO_NAME *nb = fl->names.base;
 #if P_VERBOSE
-		send_msg("---- in %s -----\n\n", fl->name);
+		console("---- in %s -----\n\n", fl->name);
 #endif
 		if (nb)
 		{
@@ -815,7 +826,7 @@ char * add_names(char **to, long *count)
 				{
 					nametotal += pn->l + 1;
 #if 0 /* P_VERBOSE */
-					send_msg("[%3ld] %6d %3d %3d %08lx %08lx %s\n",
+					console("[%3ld] %6d %3d %3d %08lx %08lx %s\n",
 							nn, pn->nr, pn->ty, pn->l, *(long *)pn, pn->s, pn->s);
 #endif
 					pn->nr = nn;		/* renumber */
@@ -830,7 +841,7 @@ char * add_names(char **to, long *count)
 	}
 
 #if P_VERBOSE
-	send_msg("\n%ld names in %ld bytes\n\n", nn, nametotal);
+	console("\n%ld names in %ld bytes\n\n", nn, nametotal);
 #endif
 
 	*count = nametotal;
@@ -851,7 +862,7 @@ void write_areas(long hdl, short ty)
 			if (ar->target eq ty and ar->limage)
 			{
 #if 0 /* P_VERBOSE */
-				send_msg("writing area %3d class %d [%6ld] %s\n", ar->id, ar->class, ar->limage, ar->name);
+				console("writing area %3d class %d [%6ld] %s\n", ar->id, ar->class, ar->limage, ar->name);
 #endif
 				P.num_areas++;
 				if (hdl > 0)
@@ -859,7 +870,7 @@ void write_areas(long hdl, short ty)
 					long have = Fwrite(hdl, ar->limage, ar->image);
 					if (have ne ar->limage)
 					{
-						send_msg("Couldnt write %s\n", P.fbase.name);
+						console("Couldnt write %s\n", P.fbase.name);
 						result = 2;
 						break;
 					}
@@ -886,7 +897,7 @@ bool wfixup(long hdl, FIX *fix)
 		long have = Fwrite(hdl, sizeof(FIX), fix);
 		if (have ne sizeof(FIX))
 		{
-			send_msg("Couldnt write %s\n", P.fbase.name);
+			console("Couldnt write %s\n", P.fbase.name);
 			result = 2;
 			return false;
 		}
@@ -1010,7 +1021,7 @@ write_names(long hdl)
 						have = Fwrite(hdl, l + 1, name);
 						if (have ne l + 1)
 						{
-							send_msg("Couldnt write %s\n", P.fbase.name);
+							console("Couldnt write %s\n", P.fbase.name);
 							result = 2;
 							break;
 						}
@@ -1040,6 +1051,7 @@ void write_object(Cstr name, short verbose, bool compile, XA_run_out *ranout)
 	FIXUP *pr = nil;
 	PC_H header;
 
+	bin_size = 0;
 	last_area = nil;				/* 05'13 HR v4.15 */
 	/* Calculate area start addresses and sizes */
 	tdata = add_areas(FIX_text, &ttext, &ltext);
@@ -1067,14 +1079,14 @@ void write_object(Cstr name, short verbose, bool compile, XA_run_out *ranout)
 
 	if (verbose > 1)
 	{
-		send_msg("  bss        : %6ld\n", lbss);
-		send_msg(" text        : %6ld\n", ltext);
-		send_msg(" data        : %6ld\n", ldata);
-		send_msg("\n");
-		send_msg("image section: %6ld  (text+data)\n", ltext + ldata);
-		send_msg("fixup section: %6ld\n", lfix);
-		send_msg(" name section: %6ld\n", lname);
-		send_msg("\n");
+		console("  bss        : %6ld\n", lbss);
+		console(" text        : %6ld\n", ltext);
+		console(" data        : %6ld\n", ldata);
+		console("\n");
+		console("image section: %6ld  (text+data)\n", ltext + ldata);
+		console("fixup section: %6ld\n", lfix);
+		console(" name section: %6ld\n", lname);
+		console("\n");
 	}
 
 	hdl = Fcreate(name, 0);
@@ -1136,6 +1148,7 @@ void write_object(Cstr name, short verbose, bool compile, XA_run_out *ranout)
 			xfree(P.fbase.image);
 		}
 
+		bin_size = ltext + ldata + lfix + lname + sizeof(header);
 		Fclose(hdl);
 	}
 }

@@ -37,7 +37,7 @@
 extern
 MEMBASE opndmem;
 
-#define error send_msg
+#define error console
 
 /*
  * bcomp(bc) - return the complement of the given branch code

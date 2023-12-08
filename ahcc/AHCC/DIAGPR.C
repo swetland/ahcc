@@ -36,16 +36,21 @@ long bios( void, ... );
 
 #define debugT (G.xflags['t'-'a'])	/* extended types */
 #define debugO (G.xflags['o'-'a'])	/* NO nflags or code or type */
-#define debugK (G.xflags['k'-'a'])	/* print keyword cataguories */
+#define debugK (G.xflags['k'-'a'])	/* print keyword categuories */
 #define debugN (G.xflags['n'-'a'])	/* print at all */
-#define debugY (G.xflags['y'-'a'])	/* print node addresses */
+#define debugY (G.xflags['y'-'a'])	/* suppress print node addresses */
 #define debugW (G.xflags['w'-'a'])	/* wait */
 
+void send_msg(char *text, ...);
 
 global
 Cstr sss(Cstr s)
 {
 	return s ? s : "~~~~~";
+}
+static VpV newline
+{
+	send_msg("\n");
 }
 
 static
@@ -194,7 +199,7 @@ void popond(OPND *op, short c)
 			switch(op->am&~XLONG)
 			{
 				case REG:
-					send_msg(preg(op->areg));	break;
+					send_msg((char *)preg(op->areg));	break;
 				case REGI:
 					send_msg("(%s)", preg(op->areg));	break;
 				case REGI|INC:
@@ -255,8 +260,7 @@ void n_flags(NP np)
 		pflg(spar);
 		pflg(lcat);
 		pflg(rcat);
-/*		pflg(bas);
-*/		pflg(res);
+		pflg(res);
 		pflg(n_ct);
 #if BIP_ASM
 		pflg(asmac);
@@ -284,8 +288,6 @@ void c_flags(NP tp)
 		pflg(undef);
 		pflg(see_reg);
 		pflg(is_arg);
-		pflg(cdec);
-		pflg(sysc);
 		pflg(rlop);
 		pflg(cfop);
 		pflg(ided);
@@ -295,8 +297,28 @@ void c_flags(NP tp)
 		pflg(qc);
 		pflg(qv);
 		pflg(q);
+		pflg(of);
+		s = fs + strlen(fs)-1;
+		*s++ = ']';
+		*s = 0;
+		send_msg("%s\t", fs);
+	}
+}
+
+static
+void x_flags(NP tp)
+{
+	char fs[64], *s;
+
+	XFLAGS f = tp->xflgs;
+	if (f.i)
+	{
+		strcpy(fs,"X[");
+		pflg(cdec);
+		pflg(sysc);
+		pflg(pasc);
 		pflg(inl_v);
-		pflg(asm_f);	/* All 16 bits used */
+		pflg(asm_f);
 		s = fs + strlen(fs)-1;
 		*s++ = ']';
 		*s = 0;
@@ -459,8 +481,6 @@ Cstr ntypes[] =
 	"        "
 };
 #undef  DEF_TOKS
-
-short alert_text(char *, ...);
 
 global
 void prntypesize(void)
@@ -685,7 +705,7 @@ void conwait(short brk)
 	{
 		bios(2, 2);
 		tel = 0;
-		send_msg("\n");
+		newline();
 		if break_in
 			exit(0);
 	}
@@ -747,7 +767,7 @@ void printtoks(void)
 					send_msg("%d", pt->x);
 				else
 					send_msg("%s", ntypes[pt->x]);
-			send_msg("\n");
+			newline();
 			conwait(brk);
 		}
 	}
@@ -780,6 +800,7 @@ void t_data(TP tp)
 	if ( tp->sc )
 		send_msg("%s\t", psclass((NP)tp) );
 	t_flags(tp);
+	x_flags((NP)tp);
 	c_flags((NP)tp);
 	if (!debugO)
 		n_flags((NP)tp);
@@ -800,8 +821,10 @@ void t_data(TP tp)
 		send_msg("(%s)%d.%ld\t", pclass(tp->area_info.class), tp->area_info.id, tp->area_info.disp);
 }
 
+#define RBR(a) send_msg("\n\n ****" #a "loophole ****\n\n");
+
 static
-void tprint(TP np, short indent, short which)			/*	typelist nodes */
+void tprint(TP np, short indent)			/*	typelist nodes */
 {
 	short ni, ind;
 	TP tp;
@@ -820,14 +843,20 @@ void tprint(TP np, short indent, short which)			/*	typelist nodes */
 		{
 			while (np)
 			{
-				send_msg(" Type{ ");
+				send_msg("T{ ");
 				name_x((NP)np);
 				t_data(np);
 				send_msg(" } ");
+				if (np eq np->type)
+				{
+					RBR(type1);
+					break;
+				}
+
 				np = np->type;
 			}
 
-			send_msg("\n");
+			newline();
 
 			while(tp)
 			{
@@ -838,7 +867,7 @@ void tprint(TP np, short indent, short which)			/*	typelist nodes */
 						if (!debugY)
 							send_msg("%lx", tp);
 						send_msg("L\t");
-						tprint(tp->next, ni, 1);
+						tprint(tp->next, ni);
 						tp->tflgs.f.lpr = 0;
 					}
 
@@ -849,15 +878,22 @@ void tprint(TP np, short indent, short which)			/*	typelist nodes */
 						if (!debugY)
 							send_msg("%lx", tp);
 						send_msg("R\t");
-						tprint(tp->list, ni, 2);
+						tprint(tp->list, ni);
 						tp->tflgs.f.rpr = 0;
 					}
+
+
+				if (tp eq tp->type)
+				{
+					RBR(type2);
+					break;
+				}
 
 				tp = tp->type;
 			}
 		}
 		else
-			send_msg("\n");
+			newline();
 	}
 }
 
@@ -897,13 +933,17 @@ void cprint(NP np) /* np is the GENODE !! */
 	VP tp;
 	short i;
 
-	send_msg("\ncode: ");
+ 	if (np->type or np->betw)
+ 		send_msg("\ncode: ");
+ 	else
+ 		newline();
+
 	if (np->betw)
 	{
 		tp = np->betw;
 		for (i = 0; i < tp->tnr; i++)
 			send_msg("\"%s\"", tp->ts[i]);
-		send_msg("\n");			/* 04'14 v5.1 */
+		newline();			/* 04'14 v5.1 */
 	}
 
 	if (np->nflgs.f.n_ct)					/* code is a string */
@@ -915,7 +955,7 @@ void cprint(NP np) /* np is the GENODE !! */
 }
 
 static
-void prnode(NP np, char *lr, short indent)
+void prnode(NP np, char *lr, short indent, bool short_t)
 {
 	short ni, ind;
 
@@ -974,17 +1014,19 @@ void prnode(NP np, char *lr, short indent)
 					if ( np->cat1)
 						send_msg(",%s\t", pcat1(np->cat1) );
 				}
+
 				if ( np->sc )
 					send_msg("%s\t",
 					        psclass(np) );
+				x_flags(np);
 				c_flags(np);
 #if FOR_A
 				a_flags((TP)np);
 #endif
 				if (np->nt eq TLNODE)
 					t_flags((TP)np);
-				else
-					e_flags(np);
+			/*	else
+			*/		e_flags(np);
 				if ( np->prec )
 					send_msg("p:%d\t", np->prec);
 
@@ -1003,10 +1045,7 @@ void prnode(NP np, char *lr, short indent)
 						send_msg("L:%08lx%08lx\t", getlcon(np));
 					else
 #endif
-					if (np->token eq ICON)
-						send_msg("I:%ld\t", np->val.i);
-					else
-						send_msg("o:%ld\t", np->val.i);
+						send_msg("val:%ld\t", np->val.i);
 
 				if (np->nt > DFNODE and np->area_info.class)
 					send_msg("(%s)%d.%ld\t", pclass(np->area_info.class), np->area_info.id, np->area_info.disp);
@@ -1031,7 +1070,7 @@ void prnode(NP np, char *lr, short indent)
 					if (np->nt eq GENODE  )
 					{
 						if ( *(short *)&np->needs )
-							send_msg("n:#%03x\t", np->needs);
+							send_msg("needs:#%03x\t", np->needs);
 						if ( np->r1 ne -1 )
 							send_msg("r1:%s\t", preg(np->r1));
 						if ( np->r2 ne -1 )
@@ -1057,16 +1096,59 @@ void prnode(NP np, char *lr, short indent)
 
 			if (np->nflgs.f.free eq 0)
 			{
-				if (!np->type or debugO)
-					send_msg("\n");
-				elif (np->nt eq GENODE)
+/*				if (!np->type or debugO)
+					newline();
+				else
+*/				if (np->nt eq GENODE)
 					cprint(np);
 				elif (np->nt eq EXNODE)
-					tprint(np->type, 0, 3);
+				{
+					if (np->type)
+					{
+						if (short_t and !debugT)
+						{
+							TP tp = np->type;
+
+							if (tp)
+							{
+								if (tp->token eq REFTO)
+								{
+									tp = tp->type;
+									if (tp)
+										send_msg("Ref to: ");
+								}
+
+								if (tp)
+								{
+									send_msg
+									(
+										"{%lx: %s, %s, %ld, %s\t",
+										tp,
+										tp->name,
+										ptok(tp->token),
+										tp->size,
+										pty(tp->ty)
+									 );
+									t_flags(tp);
+									x_flags((NP)tp);
+								}
+								else
+									send_msg("{nil");
+								send_msg("}\n");
+							}
+						}
+						elif (debugO)
+							newline();
+						else
+							tprint(np->type, 0);
+					}
+					else
+						newline();
+				}
 				elif (np->nt eq DFNODE)
 				{
-					send_msg("\n");
-					prnode((NP)((XP)np)->tseq, nil, ni);
+					newline();
+					prnode((NP)((XP)np)->tseq, nil, ni, false);
 				}
 
 				if (np->nt ne INNODE)
@@ -1080,7 +1162,7 @@ void prnode(NP np, char *lr, short indent)
 							if (np->tt ne E_UNARY and !check_tt(np))
 								send_msg("**** Left :%08lx tt %d\n", np, np->tt);
 							else
-								prnode(np->left, "L", ni);
+								prnode(np->left, "L", ni, short_t);
 						}
 						else
 							send_msg("**** left loophole %08lx\n", np);
@@ -1093,7 +1175,7 @@ void prnode(NP np, char *lr, short indent)
 							if (!check_tt(np))
 								send_msg("**** right:%08lx tt %d\n", np, np->tt);
 							else
-								prnode(np->right, "R", ni);
+								prnode(np->right, "R", ni, short_t);
 						}
 						else
 							send_msg("**** right loophole %08lx\n", np);
@@ -1116,7 +1198,7 @@ void prln(NP np, short indent)
 	{
 		nxtl = svl->left;
 		svl->left = nil;
-		prnode(svl, "*", indent);	/* "*" = root */
+		prnode(svl, "*", indent, true);	/* "*" = root */
 		svl->left = nxtl;
 		/* special hack for tag list */
 		if (svl->nflgs.f.brk_l and svl->right)
@@ -1127,7 +1209,7 @@ void prln(NP np, short indent)
 global
 void printlist(TP np)
 {
-	send_msg("\n");
+	newline();
 	prln((NP)np, 2);
 }
 
@@ -1136,20 +1218,20 @@ void frcprnode(NP np)		/* not used yet */
 {
 	if(debugW)
 	{
-		send_msg("\n");
-		prnode(np, "*", 0);
+		newline();
+		prnode(np, "*", 0, false);
 	othw
 		ONY('w');
-		send_msg("\n");
-		prnode(np, "*", 0);
+		newline();
+		prnode(np, "*", 0, false);
 		OFFY('w');
 	}
 }
 
 global
-void print_node(void *vp, char * s, bool wait, bool thisT)
+void print_node(void *vp, char * s,
+				bool wait, bool thisT, bool short_t)
 {
-#if 1
 	TP tp = vp; short t = debugT, o = debugO;
 
 	if (s)
@@ -1158,31 +1240,33 @@ void print_node(void *vp, char * s, bool wait, bool thisT)
 	debugT = thisT;
 	debugO = 0;
 
-	send_msg("\n");
+	newline();
 
 	if (tp and tp->nt eq TLNODE)
-		tprint(tp, 0, 4);
+		tprint(tp, 0);
 	else
-		prnode(vp, "*", 0);
+		prnode(vp, "*", 0, short_t);
 
 	debugT = t;
 	debugO = o;
+
 	if (wait)
 		Cconin();
-#endif
 }
 
 global
 void printnode(void *vp, bool wait)
 {
 	TP tp = vp;
+
 	if (debugN)
 	{
-		send_msg("\n");
+		newline();
+
 		if (tp and tp->nt eq TLNODE)
-			tprint(tp, 0, 5);
+			tprint(tp, 0);
 		else
-			prnode(vp, "*", 0);
+			prnode(vp, "*", 0, false);
 	}
 	if (wait)
 		Cconin();
@@ -1199,6 +1283,7 @@ void pnode_1(void *vp, Cstr txt, bool wait)		/* ad hoc printing of fields */
 		n_flags(np);
 		if (np->nt eq TLNODE)
 			t_flags((TP)np);
+		x_flags(np);
 		c_flags(np);
 	}
 	else
@@ -1233,4 +1318,28 @@ void pm_print(NP np)
 {
 	postmort(pmb, np, 28, ' ');
 	send_msg("%lx:{[%s]}\n", np, pmb);
+}
+
+FILE *B = nil;
+
+global
+void OB(void)
+{
+	B = fopen("ahcc.dbg", "w");
+}
+
+global
+void CB(void)
+{
+	fclose(B);
+}
+
+global
+void WB(Cstr txt)
+{
+	#if 1
+	console(txt);
+	#else
+	fwrite(txt, 1, strlen(txt), B);
+	#endif
 }

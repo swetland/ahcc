@@ -63,6 +63,23 @@ short std_area_to_fix[] =	/* standard area class to standard segment */
 };
 
 global
+bool is_number(const OPND *op)
+{
+	if (op)						/* 12'09 HR: stupid Milan!!! */
+
+	if (MM(op->am) eq ABS)
+	{
+		Cstr s = op->astr;
+		if (s eq nil) return true;		/* 12'09 HR: then already in op->disp */
+		if (isdigit(s[0]))
+			return true;
+		if (s[0] eq '-' and isdigit(s[1]))
+			return true;
+	}
+	return false;
+}
+
+global
 PO_NAME * get_po_name(NAMEBASE *nmb, short n)
 {
 	if (n < nmb->high)
@@ -71,6 +88,26 @@ PO_NAME * get_po_name(NAMEBASE *nmb, short n)
 		return &nm[n];
 	}
 	return nil;
+}
+
+global
+short is_lbl(Cstr l)
+{
+	if (l)
+	{
+		short lbl = 0;
+		if (*l   eq  0 ) return  0;			/* no label */
+		if (*l++ ne '_') return -1;
+		if (*l++ ne '_') return -1;
+		if (*l   eq  0 ) return -1;
+		while(*l)
+			if (*l < '0' or *l > '9' )
+				return -1;  /* no compiler generated label */
+			else
+				lbl = (lbl*10)+(*l++-'0');
+		return lbl+1;			/* '__' followed by digits only */
+	}
+	return -1;
 }
 
 global
@@ -86,7 +123,7 @@ PO_NAME * new_po_name(NAMEBASE *nmb, Cstr name, short area, short tlab, bool chk
 		tp = P.po_tab[hashval];
 		while (tp)
 		{
-			if (    strcmp(name, tp->n->s) eq 0
+			if (    SCMP(307, name, tp->n->s) eq 0
 			    and tlab eq tp->n->tlab)
 			{
 				/* is one of the names a forward reference ? */
@@ -178,8 +215,8 @@ bool o_setup(void)
 			P.po_tab = init_symtab(AH_NEW_POTAB);
 			memset(fl->names.base, 0, size);
 #if O_VERBOSE
-			send_msg("(lblnum: %d + %ld) * %ld = %ld\n", G.lblnum, ACHUNK, sizeof(PO_NAME), size);
-			send_msg("highest area: %d\n", area_id);
+			console("(lblnum: %d + %ld) * %ld = %ld\n", G.lblnum, ACHUNK, sizeof(PO_NAME), size);
+			console("highest area: %d\n", area_id);
 #endif
 			return true;
 		}
@@ -318,7 +355,7 @@ REFS * get_label(AREA *ar, Cstr name, short tlab)
 	while (rf)
 	{
 		PO_NAME *np = rf->fx->name;
-		if (strcmp(np->s, name) eq 0)
+		if (SCMP(308, np->s, name) eq 0)
 			if (tlab eq 0 or tlab eq np->tlab)
 				return rf;
 
@@ -344,7 +381,7 @@ FIXUP * o_fixup(Cstr name, short area, short ty, short tlab)
 		target = std_area_to_fix[class_now];
 		pn     = new_po_name(&fl->names, name, area, tlab, true);
 #if O_VERBOSE
-		send_msg("o_fixup: %s area, %s  id %d @ %ld\t[%d] %s[%d]%d\n",
+		console("o_fixup: %s area, %s  id %d @ %ld\t[%d] %s[%d]%d\n",
 		           pclass(class_now), fixup_name(ty), area, ar->limage,
 		           pn->area_number, pn->s, pn->tlab, pn->nr);
 #endif
@@ -363,9 +400,12 @@ FIXUP * o_fixup(Cstr name, short area, short ty, short tlab)
 global
 void o_func(BP head, short class, short area)
 {
-	o_fixup(head->name, area,
-							head->bflg.is_global ? FIX_glmod : FIX_lcmod,
-			0);
+	o_fixup(
+			head->name,
+			area,
+			head->bflg.is_global ? FIX_glmod : FIX_lcmod,
+			0
+	       );
 }
 
 global
@@ -386,7 +426,7 @@ void branch_aheads(AREA *ar, FIXUP *ef)
 			f->disp -= progress;		/* update ALL fixups positions !!! */
 
 			if (    f->fix.ty eq FIX_wbra
-			    and strcmp(f->name->s, ef->name->s) eq 0)
+			    and SCMP(309, f->name->s, ef->name->s) eq 0)
 			{
 				if (f->name->tlab eq ef->name->tlab)
 				{
@@ -404,7 +444,7 @@ void branch_aheads(AREA *ar, FIXUP *ef)
 						f->disp    -= DOT_W;
 						f->fix.ty = FIX_sbra;
 	#if F_VERBOSE
-						send_msg("reduced %s @ %ld, progress %ld, moved %ld\n",
+						console("reduced %s @ %ld, progress %ld, moved %ld\n",
 						          f->name->s, f->disp, progress, size);
 	#endif
 					}
@@ -426,7 +466,7 @@ AREA *try_bsr(FLIST *fl, AREA *this, Cstr name)
 
 	while (ar)
 	{
-		if (strcmp(ar->name, name) eq 0)
+		if (SCMP(310, ar->name, name) eq 0)
 		{
 			long tally = 0;				/* compute distance */
 
@@ -461,13 +501,13 @@ global
 void o_block(BP cb)
 {
 #if 0
-	send_msg("block(%d) ", cb->bn);
-	send_msg("name  %s  ", cb->name);
-	send_msg("fall '%s' ", cb->fall ? cb->fall->name : "");
-	send_msg("cond '%s' ", cb->cond ? cb->cond->name : "");
-	send_msg("ref(%s),",mask_to_s(cb->live));
-	send_msg("set(%s) ",mask_to_s(cb->rset));
-	send_msg("\n");
+	console("block(%d) ", cb->bn);
+	console("name  %s  ", cb->name);
+	console("fall '%s' ", cb->fall ? cb->fall->name : "");
+	console("cond '%s' ", cb->cond ? cb->cond->name : "");
+	console("ref(%s),",mask_to_s(cb->live));
+	console("set(%s) ",mask_to_s(cb->rset));
+	console("\n");
 #endif
 	if (cb->bflg.label)
 	{
@@ -511,6 +551,13 @@ void o_lab(char *name)
 				if (*name)
 					console("%s:\n", name);
 #endif
+}
+
+static
+void chk_d(long d)
+{
+	if (d < -32768 or d > 32767)
+		error("displacement out of range");
 }
 
 global
@@ -573,8 +620,7 @@ void o_brdisp(OPND *arg, short sz, ushort w1, short cc, short area)
 		elif (sz eq DOT_W)
 		{
 			a += 2;				/* Pasm compatible */
-			if (a < -32768 or a > 32767)
-				error("displacement out of range");
+			chk_d(a);
 			advance(w1);
 			advance(a);
 		othw			/* DOT_L */				/* 11'09 HR: completely forgotten */
@@ -594,8 +640,7 @@ void o_brdisp(OPND *arg, short sz, ushort w1, short cc, short area)
 		}
 		elif (sz eq DOT_W)
 		{
-			if (a < -32768 or a > 32767)
-				error("displacement out of range");
+			chk_d(a);
 			advance(w1);
 			advance(a);
 		othw
@@ -690,7 +735,7 @@ void o_endproc(void)
 							error("word pc relative overflow for %s", f->name->s);
 						*to = nd;
 #if F_VERBOSE
-						send_msg("fixed %s.W 0x%04x%04x @ %ld --> %ld, dist %ld\n",
+						console("fixed %s.W 0x%04x%04x @ %ld --> %ld, dist %ld\n",
 								f->name->s, *(to-1), *to, f->disp, ef->fx->disp, d);
 #endif
 					}
@@ -715,7 +760,7 @@ void o_endproc(void)
 							error("byte pc relative overflow for %s", f->name->s);
 						*to = nd;
 #if F_VERBOSE
-						send_msg("fixed %s.B 0x%04x @ %ld --> %ld, dist %ld\n",
+						console("fixed %s.B 0x%04x @ %ld --> %ld, dist %ld\n",
 								f->name->s, *to, f->disp, ef->fx->disp, d);
 #endif
 					}
@@ -724,7 +769,7 @@ void o_endproc(void)
 						short *to = (short *)(ar->image + f->disp);
 						*to = 047161;			/* Bcc.s 0  would be wrong; change to nop */
 #if F_VERBOSE
-						send_msg("noppens %s\n", f->name->s);
+						console("noppens %s\n", f->name->s);
 #endif
 					}
 				}
@@ -742,7 +787,7 @@ void o_endproc(void)
 						long *to = (long *)(ar->image + f->disp);
 						*to = d;
 #if F_VERBOSE
-						send_msg("fixed %s.L 0x%08lx%08lx @ %ld --> %ld, dist %ld\n",
+						console("fixed %s.L 0x%08lx%08lx @ %ld --> %ld, dist %ld\n",
 								f->name->s, *(to-1), *to, f->disp, ef->fx->disp, d);
 #endif
 					}
@@ -768,7 +813,7 @@ void o_endproc(void)
 			case FIX_bpcrel:
 				rem_list(&ar->fixups, f);
 #if F_VERBOSE
-				send_msg("removed fixup for %s\n", f->name->s);
+				console("removed fixup for %s\n", f->name->s);
 #endif
 			break;
 			case FIX_wpcrel:
@@ -776,7 +821,7 @@ void o_endproc(void)
 				if (is_tmplab(f) or no_refs(f, ar))
 				{
 #if F_VERBOSE
-					send_msg("[1]removed fixup for %s\n", f->name->s);
+					console("[1]removed fixup for %s\n", f->name->s);
 #endif
 					f->name->nr = -1;		/* remove fixup if TLAB */
 					rem_list(&ar->fixups, f);
@@ -786,7 +831,7 @@ void o_endproc(void)
 				if (is_tmplab(f) or no_refs(f, ar))
 				{
 #if F_VERBOSE
-					send_msg("[2]removed entry for %s\n", f->name->s);
+					console("[2]removed entry for %s\n", f->name->s);
 #endif
 					f->name->nr = -1;		/* remove fixup if  TLAB */
 					rem_list(&ar->fixups, f);
@@ -950,18 +995,17 @@ global
 void IXC_inst(IP ip)
 {
 	static char buf[4096];
-#define start 5
+#define start 6
 	buf[0] = 0;
 
-#if start
-	go_to(start,buf);
-#elif OPTBUG
+#if OPTBUG
 	sprintf(buf, "%ld", ip->snr);
-	go_to(start+5, buf);
+	go_to(6, buf);
+#elif start
+	go_to(start,buf);
 #endif
 	strcat(buf, pascode(ip->opcode));
 	strcat(buf, opsz(ip));
-	strlwr(buf);
 	go_to(start+8, buf);
 	if (ip->reg >= 0)
 		strcat(buf, regnm(ip->reg));
@@ -1101,7 +1145,7 @@ void o_end(short verbose)
 #if O_VERBOSE
 		FLIST *fl = P.fbase.first;
 		NAMEBASE *nmb = &fl->names;
-		send_msg("number of PO names %d\n", nmb->high);
+		console("number of PO names %d\n", nmb->high);
 #endif
 		remove_dummy_areas();
 		write_object(P.fbase.first->name, verbose, true, CC_ranout);
@@ -1220,7 +1264,7 @@ ushort o_ea(OPND *op)
 				return 070;
 			if (!op->am.f.absl)				/* 5'15 v5.2 */
 				if (op->disp > -32768 and op->disp < 32768)
-					return op->absw = 1, 070;
+					return op->am.f.absw = 1, 070;
 #else
 			if (op->am & ABSW)
 				return 070;
@@ -1473,7 +1517,7 @@ void operand_fixup(OPND *op)
 
 #if O_VERBOSE
 		if (op->disp)
-			send_msg(" -- ANAME %s.%ld + %ld '%s'\n",
+			console(" -- ANAME %s.%ld + %ld '%s'\n",
 				pn->s, op->namedisp, op->disp, op->astr ? op->astr : "~");
 #endif
 		op->disp += op->namedisp;
@@ -1482,7 +1526,7 @@ void operand_fixup(OPND *op)
 		target = std_area_to_fix[class_now];
 
 #if O_VERBOSE
-		send_msg("operand_fixup: in area %s; %s @ %ld\t%s, op->areg %d\n",
+		console("operand_fixup: in area %s; %s @ %ld\t%s, op->areg %d\n",
 		           pclass(class_now), fixup_name(ty), ar->limage, pn ? pn->s ? pn->s : "???" : "~~~", op->areg);
 #endif
 		new_fixup(&ar->fixups, pn, target, ty,
@@ -1628,7 +1672,7 @@ void o_ext(IP ip, OPND *op, short size)
 {
 	if (op eq nil)
 #if OPTBUG
-		send_msg("**** o_ext nil %s %d snr %ld bugstr %s arg %lx dst %lx ****\n",
+		console("**** o_ext nil %s %d snr %ld bugstr %s arg %lx dst %lx ****\n",
 				idata[ip->opcode].text,
 				ip->sz,
 				ip->snr,
@@ -1636,7 +1680,7 @@ void o_ext(IP ip, OPND *op, short size)
 				ip->arg,
 				ip->arg ? ip->arg->next : 0L);
 #else
-		send_msg("**** o_ext nil ****\n");
+		console("**** o_ext nil ****\n");
 #endif
 	else
 	switch (MM(op->am))
@@ -1733,7 +1777,7 @@ AREA * o_area_setup(short class, short area, Cstr start_txt)
 	short st = std_area_to_fix[class];
 
 #if O_VERBOSE
-	send_msg("making area %d %s\n", area, start_txt);
+	console("making area %d %s\n", area, start_txt);
 #endif
 
 	new = new_area(P.fbase.first, st, start_txt, CC_ranout);

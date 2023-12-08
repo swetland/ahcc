@@ -21,8 +21,6 @@
  *	========
  */
 
-#define sho(s, c) alert_text("-= " #s " 0x%02x =-", c)
-
 extern MFORM kader16, kader8, lowpijl;
 
 MUIS	m_kader;

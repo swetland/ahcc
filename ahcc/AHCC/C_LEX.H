@@ -71,7 +71,7 @@ enum
 typedef void	VpPE	(Cstr, ...);
 
 void pr_lex(LEX_RECORD *s, char *txt);
-long C_lexical(short which, Cstr name, bool, Cstr, LEX_RECORD *, long *, VpPE *, bool, short);
+long C_lexical(Cstr name, bool, Cstr, LEX_RECORD *, long *, VpPE *, bool, short);
 
 #if 1
 #define break_in (Kbshift(-1)==3)

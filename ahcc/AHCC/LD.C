@@ -30,14 +30,10 @@
 #include <setjmp.h>
 
 #include "common/mallocs.h"
-#include "common/ahcm.h"
 #include "common/amem.h"
 #include "param.h"
 
 #define REDIRECT 0		/* later */
-
-/* long bios(void, ...); */
-
 #define TEST_CHECK 1
 
 #undef prior
@@ -119,7 +115,7 @@ short bfind_ref(REFS *rf)
 	if (rf)
 	{
 		last = rf;	/* if not found we must keep the last ref and the comparison result */
-		cmp = strcmp(rname->s, rf->fx->name->s);
+		cmp = SCMP(320, rname->s, rf->fx->name->s);
 		if (cmp < 0)
 			return bfind_ref(rf->less);
 		if (cmp > 0)
@@ -171,12 +167,12 @@ short gbfind_ref(REFS *rf)
 				eq8 = rf;	    /* remember found first 8 bytes equal */
 								/* go on because complete equality prevails */
 				if (n->l > 8 or gname->l > 8)
-					cmp = strcmp(gname->s + 8, n->s + 8);
+					cmp = SCMP(321, gname->s + 8, n->s + 8);
 			}
 		}
 		else
 #endif
-			cmp = strcmp(gname->s, n->s);
+			cmp = SCMP(322, gname->s, n->s);
 
 		if (cmp < 0)
 			return gbfind_ref(rf->less);
@@ -293,6 +289,8 @@ REFS *find_parent(REFS *rb, REFS *rf)
 	}
 	return nil;
 }
+
+void send_msg(char *text, ...);
 
 static
 void list_tree(REFS *rf, char c, short lvl, bool with_parent)
@@ -526,7 +524,7 @@ bool read_obnames(Cstr fname)
 			ifile(buf);
 #endif
 		fclose(fd);
-		
+
 /*		list_flist();
 */		return true;
 	}
@@ -577,7 +575,7 @@ void doopt(Cstr s, FLGS *flg)
 			flg->f++;
 		break;
 		case 'o':				/* object file name */
-			oname = after_is(s);
+			oname = after_is(s);	/* must be last */
 			return;
 		case 'r':				/* load program in TT ram */
 			flg->tt++;
@@ -1041,7 +1039,7 @@ void entries(bool gfa)
 					new_ref(&refmem, &gl_base, ar, f, fl->obty);
 
 					if (gfa)
-						if (strcmp(f->name->s, "BaseA4") eq 0)
+						if (SCMP(323, f->name->s, "BaseA4") eq 0)
 							BaseA4 = f;
 				}
 
@@ -1314,8 +1312,11 @@ void pr_map(short target, short img)
 					send_msg("in %s\n", fl->name);
 					show = true;
 				}
-
+#if 1
+				send_msg("%08lx(%8ld)", ar->out, ar->out);
+#else
 				send_msg(img ? "%08lx" : "%8ld", ar->out);
+#endif
 				send_msg(" %6ld[%6ld]  %s %s\n",
 						d,
 						ar->limage,
@@ -1326,9 +1327,14 @@ void pr_map(short target, short img)
 				while (f)
 				{
 					if (is_entry(f->fix.ty) and !anonymous(f->name->s))		/* 05'10 HR: is_entry first */
-						if (strcmp(f->name->s, ar->name) ne 0)
+						if (SCMP(324, f->name->s, ar->name) ne 0)
 						{
-							send_msg(img ? "%08lx" : "%8ld", ar->out + f->disp);
+#if 1
+							char * s = ar->out + f->disp;
+							send_msg("%08lx(%8ld)", s, s);
+#else
+							send_msg(img ? "%08lx" : "%8ld", s);
+#endif
 							send_msg(" %6ld          %s",
 									d + f->disp,
 									disp_target(ar->target)
@@ -1348,7 +1354,7 @@ void pr_map(short target, short img)
 			ar = ar->next;
 		}
 
-		if (d) send_msg("         %6ld\n", d);
+		if (d) send_msg("                   %6ld\n", d);
 
 		fl = fl->next;
 	}
@@ -1476,6 +1482,7 @@ void write_nm(Cstr f, short img)
 	else
 		send_msg("\nend of symbols\n");
 }
+
 
 static
 void remove_unreferenced(void)
@@ -1678,8 +1685,9 @@ void write_program(short img, Wstr rom)
 			send_msg("            ------ +\n");
 			send_msg("            %6ld\n", total + stacksize);
 		}
-		send_msg("\nfile  size: %6ld\n", imgsize ? imgsize :
-			lhead + ltext + ldata + lreloc + lsym);
+
+		bin_size = imgsize ? imgsize : lhead
+		         + ltext + ldata + lreloc + lsym;
 	}
 }
 

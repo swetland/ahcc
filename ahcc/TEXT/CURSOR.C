@@ -39,8 +39,6 @@
 /*  > WSP	= 'word' --> value */
 /* other values: special characters; see <cursor.h> for TRANS_CH */
 
-/*	string tbv AHCX test: })]>{([< */
-
 TRANS_CH chcl[]=
 {
 	WSP,										/* hex(00) end string */
@@ -163,7 +161,7 @@ bool t_to_s_x(IT *w, STMNR cu_y, short to_x, CINF *ci, short rich)
 		pm = w->line;
 		ps = pm;
 
-		while (     c <  to_x			
+		while (     c <  to_x
 		       and  c <=  w->view.sz.w
 		       and (p  = *pm) ne 0
 		      )
@@ -197,7 +195,7 @@ bool t_to_s_x(IT *w, STMNR cu_y, short to_x, CINF *ci, short rich)
 #endif
 	/* no text: no weird tabulate thing */
 	{
-		ci->scrx  = to_x;	
+		ci->scrx  = to_x;
 		ci->pos.x = to_x;
 		return (ci->pos.x < w->view.sz.w - 1);
 	}
@@ -257,7 +255,7 @@ NEXT_CH prev_ch
 	ci->pos.y--;
 	if ((nx = stmfiprior(d)) eq 0L)
 		return ci->pos.y = 0, FBOUND;	/* allways translates to stopchar */
-	ci->pos.x = nx->xl;
+	ci->pos.x = nx->x_l;
 	w->line = nx->xtx;
 	return '\n';
 }
@@ -599,7 +597,7 @@ short Find(IT *w,						/* window info									*/
 						zs.pos.y--;
 						if ( (s=stmfiprior(d)) eq 0L)
 							break;
-						zs.pos.x=s->xl;
+						zs.pos.x=s->x_l;
 						l=w->line=s->xtx;
 						l+=zs.pos.x;
 					othw
@@ -621,7 +619,7 @@ short Find(IT *w,						/* window info									*/
 					zs.pos.y--;
 					if ( (s=stmfiprior(d)) eq 0L)
 						break;
-					zs.pos.x=s->xl;
+					zs.pos.x=s->x_l;
 					l=w->line=s->xtx;
 					l+=zs.pos.x;
 				othw

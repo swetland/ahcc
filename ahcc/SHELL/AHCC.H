@@ -39,11 +39,11 @@
 #define MNPRJT           57  /* STRING in Baum AMENU */
 #define MNCOMP           59  /* STRING in Baum AMENU */
 #define MNCOMPF          60  /* STRING in Baum AMENU */
-#define MNASSEMF         61  /* STRING in Baum AMENU */
-#define MNMAKE           63  /* STRING in Baum AMENU */
-#define MNMAKEAL         64  /* STRING in Baum AMENU */
-#define MNLINK           65  /* STRING in Baum AMENU */
-#define CODBG            67  /* STRING in Baum AMENU */
+#define MNMAKE           62  /* STRING in Baum AMENU */
+#define MNMAKEAL         63  /* STRING in Baum AMENU */
+#define MNLINK           64  /* STRING in Baum AMENU */
+#define CODBG            66  /* STRING in Baum AMENU */
+#define MNTOKS           67  /* STRING in Baum AMENU */
 #define CONDBG           68  /* STRING in Baum AMENU */
 #define DBGTXT           69  /* STRING in Baum AMENU */
 
@@ -110,28 +110,22 @@
 #define MNJFICU          28  /* STRING in Baum JOURNAL */
 #define MNJFIES          29  /* STRING in Baum JOURNAL */
 
-#define DMENU            3   /* Menuebaum */
-#define MTDP             3   /* TITLE in Baum DMENU */
-#define DPEXPAND         6   /* STRING in Baum DMENU */
-#define DPOPEN           7   /* STRING in Baum DMENU */
-
-#define BUGGER           4   /* Formular/Dialog */
+#define BUGGER           3   /* Formular/Dialog */
 #define B2MOVER          1   /* STRING in Baum BUGGER */
-#define COKL             2   /* BUTTON in Baum BUGGER */
+#define COLN             2   /* BUTTON in Baum BUGGER */
 #define CONN             3   /* BUTTON in Baum BUGGER */
-#define COX              6   /* BUTTON in Baum BUGGER */
-#define COXL             7   /* FTEXT in Baum BUGGER */
-#define COY              9   /* BUTTON in Baum BUGGER */
-#define COYL             10  /* FTEXT in Baum BUGGER */
-#define COA              11  /* BUTTON in Baum BUGGER */
-#define COZ              12  /* BUTTON in Baum BUGGER */
-#define COLN             13  /* BUTTON in Baum BUGGER */
-#define COSL             14  /* BUTTON in Baum BUGGER */
-#define B2BTNS           15  /* IBOX in Baum BUGGER */
-#define B2CANC           16  /* BUTTON in Baum BUGGER */
-#define B2OK             17  /* BUTTON in Baum BUGGER */
+#define COSL             4   /* BUTTON in Baum BUGGER */
+#define COX              7   /* BUTTON in Baum BUGGER */
+#define COXL             8   /* FTEXT in Baum BUGGER */
+#define COY              10  /* BUTTON in Baum BUGGER */
+#define COYL             11  /* FTEXT in Baum BUGGER */
+#define COA              12  /* BUTTON in Baum BUGGER */
+#define COZ              13  /* BUTTON in Baum BUGGER */
+#define B2BTNS           14  /* IBOX in Baum BUGGER */
+#define B2CANC           15  /* BUTTON in Baum BUGGER */
+#define B2OK             16  /* BUTTON in Baum BUGGER */
 
-#define KIT              5   /* Formular/Dialog */
+#define KIT              4   /* Formular/Dialog */
 #define KIT1             0   /* BOX in Baum KIT */
 #define DFBLOK           1   /* BUTTON in Baum KIT */
 #define DSBTNS           2   /* IBOX in Baum KIT */
@@ -251,52 +245,49 @@
 #define COMATCH          141 /* FTEXT in Baum KIT */
 #define CORN             143 /* FTEXT in Baum KIT */
 #define DOPBLOK          144 /* BUTTON in Baum KIT */
-#define COD              146 /* BUTTON in Baum KIT */
-#define CODEF            147 /* FTEXT in Baum KIT */
-#define COD1             148 /* BUTTON in Baum KIT */
-#define CODEF1           149 /* FTEXT in Baum KIT */
-#define COD2             150 /* BUTTON in Baum KIT */
-#define CODEF2           151 /* FTEXT in Baum KIT */
-#define COD3             152 /* BUTTON in Baum KIT */
-#define CODEF3           153 /* FTEXT in Baum KIT */
-#define COD4             154 /* BUTTON in Baum KIT */
-#define CODEF4           155 /* FTEXT in Baum KIT */
-#define COI              157 /* BUTTON in Baum KIT */
-#define COINCL           158 /* FTEXT in Baum KIT */
-#define COI1             159 /* BUTTON in Baum KIT */
-#define COINCL1          160 /* FTEXT in Baum KIT */
-#define COI2             161 /* BUTTON in Baum KIT */
-#define COINCL2          162 /* FTEXT in Baum KIT */
-#define COI3             163 /* BUTTON in Baum KIT */
-#define COINCL3          164 /* FTEXT in Baum KIT */
-#define COI4             165 /* BUTTON in Baum KIT */
-#define COINCL4          166 /* FTEXT in Baum KIT */
-#define COC              167 /* BUTTON in Baum KIT */
-#define COK              168 /* BUTTON in Baum KIT */
-#define CORP             169 /* BUTTON in Baum KIT */
-#define CO32             170 /* BUTTON in Baum KIT */
-#define COXNL            171 /* BUTTON in Baum KIT */
-#define COE              172 /* BUTTON in Baum KIT */
-#define COF              173 /* BUTTON in Baum KIT */
-#define COGO             174 /* BUTTON in Baum KIT */
-#define CO2              175 /* BUTTON in Baum KIT */
-#define CO8              176 /* BUTTON in Baum KIT */
-#define CO1              177 /* BUTTON in Baum KIT */
-#define COSUP            178 /* BUTTON in Baum KIT */
-#define COEN             179 /* FTEXT in Baum KIT */
-#define COWN             180 /* FTEXT in Baum KIT */
-#define LOPBLOK          181 /* BUTTON in Baum KIT */
-#define COG              182 /* BUTTON in Baum KIT */
-#define COT              183 /* BUTTON in Baum KIT */
-#define COFL             184 /* BUTTON in Baum KIT */
-#define COMST            185 /* BUTTON in Baum KIT */
-#define COLIB            186 /* BUTTON in Baum KIT */
-#define COLIBDIR         187 /* FTEXT in Baum KIT */
-#define COSY             188 /* BUTTON in Baum KIT */
-#define COL              189 /* BUTTON in Baum KIT */
-#define COJ              190 /* BUTTON in Baum KIT */
-#define COLST            191 /* BUTTON in Baum KIT */
-#define KIT_MAX          192 /* TEXT in Baum KIT */
+#define COK              145 /* BUTTON in Baum KIT */
+#define CO32             146 /* BUTTON in Baum KIT */
+#define COE              147 /* BUTTON in Baum KIT */
+#define COEN             148 /* FTEXT in Baum KIT */
+#define COF              149 /* BUTTON in Baum KIT */
+#define COWN             150 /* FTEXT in Baum KIT */
+#define COD              152 /* BUTTON in Baum KIT */
+#define CODEF            153 /* FTEXT in Baum KIT */
+#define COD1             154 /* BUTTON in Baum KIT */
+#define CODEF1           155 /* FTEXT in Baum KIT */
+#define COD2             156 /* BUTTON in Baum KIT */
+#define CODEF2           157 /* FTEXT in Baum KIT */
+#define COD3             158 /* BUTTON in Baum KIT */
+#define CODEF3           159 /* FTEXT in Baum KIT */
+#define COD4             160 /* BUTTON in Baum KIT */
+#define CODEF4           161 /* FTEXT in Baum KIT */
+#define COI              163 /* BUTTON in Baum KIT */
+#define COINCL           164 /* FTEXT in Baum KIT */
+#define COI1             165 /* BUTTON in Baum KIT */
+#define COINCL1          166 /* FTEXT in Baum KIT */
+#define COI2             167 /* BUTTON in Baum KIT */
+#define COINCL2          168 /* FTEXT in Baum KIT */
+#define COI3             169 /* BUTTON in Baum KIT */
+#define COINCL3          170 /* FTEXT in Baum KIT */
+#define COI4             171 /* BUTTON in Baum KIT */
+#define COINCL4          172 /* FTEXT in Baum KIT */
+#define LOPBLOK          173 /* BUTTON in Baum KIT */
+#define COG              174 /* BUTTON in Baum KIT */
+#define COT              175 /* BUTTON in Baum KIT */
+#define COFL             176 /* BUTTON in Baum KIT */
+#define COMST            177 /* BUTTON in Baum KIT */
+#define COLIB            178 /* BUTTON in Baum KIT */
+#define COLIBDIR         179 /* FTEXT in Baum KIT */
+#define COSY             180 /* BUTTON in Baum KIT */
+#define COL              181 /* BUTTON in Baum KIT */
+#define COJ              182 /* BUTTON in Baum KIT */
+#define COLST            183 /* BUTTON in Baum KIT */
+#define KIT_MAX          184 /* TEXT in Baum KIT */
+
+#define DMENU            5   /* Menuebaum */
+#define MTDP             3   /* TITLE in Baum DMENU */
+#define DPEXPAND         6   /* STRING in Baum DMENU */
+#define DPOPEN           7   /* STRING in Baum DMENU */
 
 #define IW               0   /* Alert String */
 

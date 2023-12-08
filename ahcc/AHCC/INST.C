@@ -32,16 +32,13 @@
 #include <string.h>
 
 #include "common/mallocs.h"
-#include "common/ahcm.h"
-
 #include "param.h"
-
 #include "out.h"
 #include "opt.h"
 #include "reg.h"
 #include "inst.h"
 
-#define error send_msg
+#define error console
 
 long lineno = 0;
 
@@ -166,7 +163,7 @@ RMASK chkref(OPND *op, bool is_src)
 		return RM(SP);
 
 	default:
-		error("OE: illegal mode in chkref() %d\n", MM(op->am));
+		error("OE: Illegal mode in chkref() %d\n", MM(op->am));
 		return 0;
 	}
 }
@@ -246,20 +243,27 @@ RMASK chkside(IP ip, IFLAG type)
 			return WORKX|RM(SP);
 		if (   !G.h_cdecl_calling and arg->next and MO(arg->next->am) )
 		{
+			char *iname(IP ip);
 			Cstr s = arg->next->astr;
-			while (*s) if (*s ne ':') s++; else break;
-			if (*s eq ':')
+
+			if (s)
 			{
-				s++;
-				if (*s eq '#')
+				while (*s) if (*s ne ':') s++; else break;
+
+				if (*s eq ':')
 				{
-					RMASK l = atol(s+1);
-					if (l&RM(FRAMEP))
-						console("jsr | FRAMEP %ld(%lx)\n", l, l);
-					return l|RM(SP);
+					s++;
+
+					if (*s eq '#')
+					{
+						RMASK l = atol(s+1);
+						if (l&RM(FRAMEP))
+							console("jsr | FRAMEP %ld(%lx)\n", l, l);
+						return l|RM(SP);
+					}
+					else
+						return s_to_mask(s)|RM(SP);
 				}
-				else
-					return s_to_mask(s)|RM(SP);
 			}
 			return RM(SP);
 		}
@@ -414,7 +418,7 @@ short area_number(char *);
 
 
 static
-void see_name(short which, OPND *op, char *s)
+void see_name(OPND *op, char *s)
 {
 	if (*s eq '<')
 	{
@@ -536,7 +540,7 @@ OPND * getop(char *s, OPND *opnd)
 #else
 			op->am |= SYMB;
 #endif
-			see_name(2, op, s);
+			see_name(op, s);
 		}
 	}
 	elif ((reg = isreg(s)) >= 0)
@@ -614,7 +618,7 @@ OPND * getop(char *s, OPND *opnd)
 		MO(op->am) = PCD;
 	othw
 		MO(op->am) = ABS;
-		see_name(1, op, s);
+		see_name(op, s);
 	}
 
 
@@ -779,7 +783,7 @@ IP addinst(BP bp, char *op, char *reg, char *args, char *dest)
 			freeIn(ni);
 			return nil;
 #endif
-		case REGL:
+		case RGL:
 			loclist = get_locs(ni);
 			regi = ni;		/* save for puttimg in front */
 			return ni;
@@ -986,7 +990,7 @@ bool opeq(const OPND *op1, const OPND *op2, bool dec)
 		return false;
 
 	if (op1->astr)
-		if (strcmp(op1->astr, op2->astr) ne 0)
+		if (SCMP(304, op1->astr, op2->astr) ne 0)
 			return false;
 
 	return op1->disp eq op2->disp;
@@ -1024,7 +1028,7 @@ bool opeq(const OPND *op1, const OPND *op2, bool dec)
 		return false;
 
 	if (op1->astr)
-		if (strcmp(op1->astr, op2->astr) ne 0)
+		if (SCMP(305, op1->astr, op2->astr) ne 0)
 			return false;
 
 	return op1->disp eq op2->disp;

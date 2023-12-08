@@ -36,6 +36,7 @@ short alert_text(char *t, ... );
 #define sbslash "\\"
 
 #define NO_INT 1		/* make int synonymous to either short or long */
+#define SY_LATER 1		/* delay symbol tables insertion after args */
 
 #if C_DEBUG
 	#define CE 1			/* output compiler errors (more permanently than debugging) */
@@ -75,6 +76,8 @@ short alert_text(char *t, ... );
  *		jan 09			Published on my homepage
  */
 
+#include <stdio.h>
+
 #if BIP_CC				/* look who's calling */
 	#ifdef TTPSHELL
 		#define      AHCC compiler		/* integrated in GEM shell */
@@ -86,7 +89,6 @@ short alert_text(char *t, ... );
 		typedef void AHCOUT;
 	#endif
 #else
-
 	#define      AHCC main			/* freestanding TTP program */
 	#define EXIT_AHCC exit
 	typedef FILE AHCOUT;
@@ -102,12 +104,9 @@ short alert_text(char *t, ... );
 #endif
 
 #define WARN_AREA '#'
-#if C_DEBUG
 #undef TRACE
-#define TRACE(a) send_msg("= " #a " %ld =-\n", lineno), Cconin()
-#undef RTR
-#define RTR(a,b) send_msg("-= " #a " %d =-\n", b->r1)
-#endif
+void send_msg(char *text, ...);
+#define TRACE(a) send_msg("= " #a " %ld =-\n", line_no), Cconin()
 
 extern bool last_k,MagX,MiNT;
 extern AHCOUT *bugf;
@@ -282,7 +281,6 @@ enum
 #if C_DEBUG		/* invoke extensive debugging info (for the compiler itself) */
 	extern short pstk;
 	void paragraph(Cstr a);
-	#define D_(z,s) if (debug ## z) bpr(s)	/* paragraph tracer */
 	#define C(s) "\t;\t" #s
 	#define REGLIST 1
 
@@ -508,8 +506,21 @@ bool is_assignment(short t);
 
 /* The following macros are type indifferent */
 #define is_scon(x)  ((x)->token >= ASCON and (x)->token <= SCON2)
-#define is_immed(np) ((np)->eflgs.f.imm)
-#define un_immed(np) (np)->eflgs.f.imm = 0
+
+#define to_immed(np)    (np)->eflgs.f.imm = 1
+#define is_immed(np)   ((np)->eflgs.f.imm)
+#define un_immed(np)    (np)->eflgs.f.imm = 0
+#define  c_immed(np,lp) (np)->eflgs.f.imm |= (lp)->eflgs.f.imm
+
+/* 10'19 HR: v6 complete offsetof (builtin) */
+#define to_of(np)    (np)->cflgs.f.of = 1
+#define is_of(np)   ((np)->cflgs.f.of)
+#define  c_of(np,lp) (np)->cflgs.f.of |= (lp)->cflgs.f.of
+
+/* 09'19 HR: v6 complete offsetof (Pure C style) */
+#define to_cp(np)    (np)->cflgs.f.cp = 1
+#define is_cp(np)   ((np)->cflgs.f.cp)
+#define  c_cp(np,lp) (np)->cflgs.f.cp |= (lp)->cflgs.f.cp
 
 extern TOKEN tok_tab[];
 

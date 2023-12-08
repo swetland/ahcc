@@ -20,22 +20,25 @@
 #define __SCR_INST__
 #include <string.h>
 #include "aaaa_lib.h"
-
-global
-short
-	v_hl;	/* Virtual workstation handle (scheduled for redundancy) */
-
 global
 short phys_handle, virt_handle;		/* workstation handles */
 
-typedef union
+typedef struct
 {
+	union
+	{
+		short wo[57];
+		V_WORKOUT vw;
+	}vwk;
 	short wi[12];
-	short wo[57];
-	V_WORKOUT vw;
 } V_WORK;
 
+
+#define VW vwk.vw
+#define WO vwk.wo
+
 V_WORK scr;
+
 PALETTE desk[BANKEN];
 
 global
@@ -55,9 +58,9 @@ global
 void *_f_logbase;
 
 global
-RECT  scr_grect={0,0,0,0};	/* global GRECT (aes) van scherm voor de handigheid */
+RECT  screct={0,0,0,0};		/* global GRECT (aes) van scherm voor de handigheid */
 global
-VRECT scr_vrect={0,0,0,0};	/*    "   VRECT (vdi)        "               "      */
+VRECT scvrect={0,0,0,0};	/*    "   VRECT (vdi)        "               "      */
 
 global
 MFDB MFDBnull={nil,0,0,0,0,0,0,0,0},
@@ -76,49 +79,67 @@ void copy_gform(short hl, DRBVN pxy, MFDB *van,MFDB *naar)
 }
 
 global
-short instt_scr(void)
+short open_vwk(short which, char * s, short *wi, short *wo)
 {
-	short i,dd,handle;
+	short i, hl, ax, ay, vwi[12], vwo[57];
 
-	phys_handle=graf_handle(&_fwc,&_fhc,&dd,&dd);
-	scr.vw.phl = phys_handle;		/* 05'17 HR */
-	handle = phys_handle;
-	for(i=0;i<=10;scr.wi[i++]=1);
-	scr.wi[10]=2;
-	v_opnvwk(scr.wi,&handle,scr.wo);
-	scr.vw.hl=handle;
-	virt_handle = v_hl = handle; /* various applications */
-	vsf_interior (handle,FIS_SOLID);
-	vsf_style    (handle,0);
-	vsf_color    (handle,0);
-	vsf_perimeter(handle,0);
+#if 1
+	if (!wi) wi = vwi;
+	if (!wo) wo = vwo;
+#else
+	if (!wi) wi = scr.wi;
+	if (!wo) wo = scr.WO;
+#endif
 
-	vst_alignment(handle,0,4,&dd,&dd);
+	for(i=0;i<=10;wi[i++]=1);
+	wi[10]=2;
+	hl = phys_handle;
+	v_opnvwk(wi,&hl,wo);
 
-	vsl_color(handle, 1);		/* sensible defaults independent of VDI authors' opinion (HR: grmbl) */
-	vsl_type(handle, 1);
+	vsf_interior (hl,FIS_SOLID);
+	vsf_style    (hl,0);
+	vsf_color    (hl,0);
+	vsf_perimeter(hl,0);
 
-	vswr_mode(handle, 1);
+	vsl_color(hl, 1);		/* sensible defaults independent of VDI authors' opinion (HR: grmbl) */
+	vsl_type(hl, 1);
 
-	scr_vrect.jx=scr.vw.w;
-	scr_vrect.jy=scr.vw.h;
-	scr.vw.w+=1;
-	scr.vw.h+=1;
-	_fw=scr.vw.w;
-	_fh=scr.vw.h;
-	scr_grect.w=_fw;
-	scr_grect.h=_fh;
-	scr.vw.kleur=scr.vw.kleur?-1:1;
-	scr.vw.hchar=_fhc;
-	scr.vw.wchar=_fwc;
-	i=scr.vw.kleuren;
+	vst_alignment(hl,0, 5, &ax, &ay);	/* 5 = top line */
 
-	vq_extnd(handle,1,(short *)&scr.vw.scrart);
+	vswr_mode(hl, 1);
+	return hl;
+}
 
-	_fp=scr.vw.planes;
-	scr.vw.pla=_fp;				/* compatability pre vq_extnd */
+global
+VV instt_scr
+{
+	short dum,hl;
 
-	scr.vw.scrl=((long)scr.vw.w*scr.vw.h*_fp)/8;
+	phys_handle=graf_handle(&_fwc,&_fhc,&dum,&dum);
+	scr.VW.phl  = phys_handle;		/* 05'17 HR */
+
+	hl = open_vwk(3,"desk",scr.wi, scr.WO);
+	virt_handle = hl;
+	scr.VW.hl   = hl;
+
+	scvrect.jx=scr.VW.w;
+	scvrect.jy=scr.VW.h;
+	scr.VW.w+=1;
+	scr.VW.h+=1;
+	_fw=scr.VW.w;
+	_fh=scr.VW.h;
+	screct.w=_fw;
+	screct.h=_fh;
+	scr.VW.kleur=scr.VW.kleur?-1:1;
+	scr.VW.hchar=_fhc;
+	scr.VW.wchar=_fwc;
+
+	vq_extnd(hl,1,(short *)&scr.VW.scrart);
+
+	_fp=scr.VW.planes;
+	scr.VW.pla=_fp;				/* compatability pre vq_extnd */
+
+	scr.VW.scrl=((long)scr.VW.w*scr.VW.h*_fp)/8;
 
 	_nova = get_cookie('IMNE',nil);
 	_t2w  = get_cookie('_T2W',nil);
@@ -128,64 +149,64 @@ short instt_scr(void)
 
 	if ( _fp eq 4 and _fhc eq 8)
 	{
-		scr.vw.rez=0;
-		scr.vw.promode=scr.vw.tinten > 512 ? TT :ST;
-		scr.vw.banken=scr.vw.tinten > 512 ? BANKEN : 0;
+		scr.VW.rez=0;
+		scr.VW.promode=scr.VW.tinten > 512 ? TT :ST;
+		scr.VW.banken=scr.VW.tinten > 512 ? BANKEN : 0;
 	}
 	else
 	if (_fp eq 2 and _fhc eq 8)
 	{
-		scr.vw.rez=1;
-		scr.vw.promode=scr.vw.tinten > 512 ? TT :ST;
-		scr.vw.banken=scr.vw.tinten > 512 ? BANKEN : 0;
+		scr.VW.rez=1;
+		scr.VW.promode=scr.VW.tinten > 512 ? TT :ST;
+		scr.VW.banken=scr.VW.tinten > 512 ? BANKEN : 0;
 	}
 	else
 	if (_fp eq 1 and _fhc eq 16)
 	{
-		if (scr.vw.kleur eq -1)
+		if (scr.VW.kleur eq -1)
 		{
-			scr.vw.promode=TT;		/* duochrome */
-			scr.vw.rez=2;
-			scr.vw.banken=0;
+			scr.VW.promode=TT;		/* duochrome */
+			scr.VW.rez=2;
+			scr.VW.banken=0;
 		othw
-			if (scr.vw.w > 1024)
+			if (scr.VW.w > 1024)
 			{
-				scr.vw.rez=5;
-				scr.vw.promode=TT;
-				scr.vw.banken=0;
+				scr.VW.rez=5;
+				scr.VW.promode=TT;
+				scr.VW.banken=0;
 			othw
-				scr.vw.promode=ST;
-				scr.vw.rez=2;
-				scr.vw.banken=0;
+				scr.VW.promode=ST;
+				scr.VW.rez=2;
+				scr.VW.banken=0;
 			}
 		}
 	}
 	else
 	if (_fp eq 8 and _fhc eq 16)
 	{
-		if (scr.vw.w > scr.vw.h)
+		if (scr.VW.w > scr.VW.h)
 		{
-			scr.vw.rez = 6;
-			scr.vw.promode=NANA;
+			scr.VW.rez = 6;
+			scr.VW.promode=NANA;
 		othw
-			scr.vw.rez=3;
-			scr.vw.promode=TT;
+			scr.VW.rez=3;
+			scr.VW.promode=TT;
 		}
-		scr.vw.banken=BANKEN;
+		scr.VW.banken=BANKEN;
 	}
 	else
 	if (_fp eq 4 and _fhc eq 16)
 	{
-		scr.vw.rez=4;
-		scr.vw.promode=TT;
-		scr.vw.banken=BANKEN;
+		scr.VW.rez=4;
+		scr.VW.promode=TT;
+		scr.VW.banken=BANKEN;
 	}
 	else
-	if (_fp > 8 and !scr.vw.clut)
+	if (_fp > 8 and !scr.VW.clut)
 	{
-		scr.vw.rez = _fp eq 16 ? 7 : 8;
-		scr.vw.promode=NANA;
-		scr.vw.banken=BANKEN;
+		scr.VW.rez = _fp eq 16 ? 7 : 8;
+		scr.VW.promode=NANA;
+		scr.VW.banken=BANKEN;
 	}
 	else
 	{
@@ -196,20 +217,20 @@ short instt_scr(void)
 			             "[ Oh! ]");
 		else
 		{
-			scr.vw.rez=9;
-			scr.vw.promode=NANA;
-			scr.vw.banken=BANKEN;
+			scr.VW.rez=9;
+			scr.VW.promode=NANA;
+			scr.VW.banken=BANKEN;
 		}
 	}
 
-	scr.vw.l.w=scr.vw.w;		/*	voor zachte software */
-	scr.vw.l.h=scr.vw.h;
+	scr.VW.l.w=scr.VW.w;		/*	voor zachte software */
+	scr.VW.l.h=scr.VW.h;
 
-	scr.vw.rdis=(scr.vw.w/_fwc)*_fp;	/* voor harde software (DEGAS) */
-	scr.vw.nword =2*(_fp-1);
-	scr.vw.wwidth=scr.vw.rdis/2;
-	_fww=scr.vw.wwidth;
-	_frd=scr.vw.rdis;
+	scr.VW.rdis=(scr.VW.w/_fwc)*_fp;	/* voor harde software (DEGAS) */
+	scr.VW.nword =2*(_fp-1);
+	scr.VW.wwidth=scr.VW.rdis/2;
+	_fww=scr.VW.wwidth;
+	_frd=scr.VW.rdis;
 	_f_logbase=Logbase();
 	instmfdb.fd_w=_fw;		/* all tbv setscreen by copy raster */
 	instmfdb.fd_h=_fh;
@@ -220,7 +241,6 @@ short instt_scr(void)
 	instdrb.pv.w=_fw;
 	instdrb.pv.h=_fh;
 	instdrb.pn=instdrb.pv;
-	return handle;
 }
 
 global
@@ -228,17 +248,19 @@ void setscreen(void *s)
 {
 	hidem;
 	instmfdb.fd_addr=s;
-	copy_gform(scr.vw.hl,instdrb,&instmfdb,&MFDBnull);
+	copy_gform(scr.VW.hl,instdrb,&instmfdb,&MFDBnull);
 	showm;
 }
 
-global short get_cwch(int vl, int wi[], int wo[], int *cw, int *ch)
+
+global
+short get_cwch(short vhl, short wi[], short wo[], short *cw, short *ch)
 {
 	*cw = _fwc;
 	*ch = _fhc;
 	memmove(wi, scr.wi, sizeof(scr.wi));
-	memmove(wo, scr.wo, sizeof(scr.wo));
-	return vl;
+	memmove(wo, scr.WO, sizeof(scr.WO));
+	return vhl;
 }
 
 global
@@ -246,62 +268,63 @@ void getscreen(void *s)
 {
 	hidem;
 	instmfdb.fd_addr=s;
-	copy_gform(scr.vw.hl,instdrb,&MFDBnull,&instmfdb);
+	copy_gform(scr.VW.hl,instdrb,&MFDBnull,&instmfdb);
 	showm;
 }
 
 global
-void resetdesk(void)
+VV resetdesk
 {
 	short i,j;
 
-	if (scr.vw.planes >= 8)
+	if (scr.VW.planes >= 8)
 	{
 		loop(i,BANKEN)
 			loop(j,BANK)
-				vs_color(scr.vw.hl,i*BANKEN+j,desk[i].v_col(j));
+				vs_color(scr.VW.hl,i*BANKEN+j,desk[i].v_col(j));
 	othw
-		if (scr.vw.kleur < 0)
+		if (scr.VW.kleur < 0)
 			loop(i,BANK)
-				vs_color(scr.vw.hl,i,desk[0].v_col(i));
+				vs_color(scr.VW.hl,i,desk[0].v_col(i));
 	}
 }
 
 global
-void savedesk(void)
+VV savedesk
 {
 	short i,j;
 
-	if (scr.vw.planes >= 8)
+	if (scr.VW.planes >= 8)
 	{
 		loop(i,BANKEN)
 			loop(j,BANK)
-				vq_color(scr.vw.hl,i*BANKEN+j,0,desk[i].v_col(j));
+				vq_color(scr.VW.hl,i*BANKEN+j,0,desk[i].v_col(j));
 	othw
-		if (scr.vw.kleur < 0)
+		if (scr.VW.kleur < 0)
 			loop(i,BANK)
-				vq_color(scr.vw.hl,i,0,desk[0].v_col(i));
+				vq_color(scr.VW.hl,i,0,desk[0].v_col(i));
 	}
 }
 
 global
 void Getcolor(short k,COLOR *kl)
 {
-	vq_color(scr.vw.hl,k,0,kl->argb.rgb);
+	vq_color(scr.VW.hl,k,0,kl->argb.rgb);
 }
 
+/* 18'20 HR: v6 vhl */
 global
-void TsetPalet(PALETTE *pal,short all)
+void TsetPalet(short which, short vhl,PALETTE *pal,short all)
 {
 	short i,j;
 
-	if (all and scr.vw.planes >= 8)
+	if (all and scr.VW.planes >= 8)
 		loop(i,BANKEN)
 			loop(j,BANK)
-				vs_color(scr.vw.hl,i*BANKEN+j,pal[i].v_col(j));
+				vs_color(vhl,i*BANKEN+j,pal[i].v_col(j));
 	else
 		loop(i,BANK)
-			vs_color(scr.vw.hl,i,pal->v_col(i));
+			vs_color(vhl,i,pal->v_col(i));
 }
 
 /*----------------------------------------------------------------------------------*/
@@ -410,7 +433,7 @@ MFORM lowpijl =
 };
 
 global
-void marrow(void)
+VV marrow
 {
 	if ( _fhc > 8)
 		graf_mouse(0,nil);

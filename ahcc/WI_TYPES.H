@@ -89,7 +89,7 @@ typedef bool DRAG_SEL (struct it *w, short button, short kstate,
                                            short bclicks,
                                            short mx, short my);
 typedef void CON_RET (struct it *w,char *line,short prompt,short curtask,short curstage);
-typedef void WICON (RECT r, bool op, bool sel, bool kleur);
+typedef void WICON (short hl, RECT r, bool op, bool sel, bool kleur);
 typedef bool CINFI (struct it *w,
 		long cu_y,
 		short to_x,
@@ -218,6 +218,22 @@ typedef union
 
 typedef enum {NEST,TERM,EMP} TRVty;
 
+typedef struct position
+{
+	short x; long y;
+} POS;
+
+typedef struct size
+{
+	short w; long h;
+} SZ;
+
+typedef struct a_rect
+{
+	POS pos;
+	SZ  sz;
+} A_RECT;
+
 typedef struct name_nest
 {
 	struct name_nest *d,			/* deeper level (nil = not exploded or terminal) */
@@ -225,9 +241,12 @@ typedef struct name_nest
 	                 *o;			/* pointer to outer */
 	short
 		dep,						/* depth ( no of '\' -1 ) */
-		state,						/* state (selected) */
-		ln,							/* line no (behind window) */
-		subs;						/* no of subsiduaries */
+		state;						/* state (selected) */
+
+	long
+		subs,						/* no of subsiduaries */
+		ln;							/* line no (behind window) */
+
 	TRVty f;						/* directory, terminal or whatever */
 	short count;
 	RECT r;							/* for clicking */

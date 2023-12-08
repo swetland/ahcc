@@ -29,7 +29,11 @@
 
 #include "aaaa.h"
 
-#if GEMSHELL || TEXTFILE || BINARY
+#ifdef SOPT
+#include "common/scrap.h"
+#endif
+
+#if GEMSHELL || TEXTFILE || BINED
 #include "common/kit.h"
 #endif
 
@@ -54,7 +58,7 @@
 #include "digger/digobj.h"
 #endif
 
-#if BINARY
+#if BINED
 #include "bined/ed.h"
 #endif
 
@@ -97,15 +101,11 @@ OBJECT  *Menu;
 M_S	mainmenu={false,false,0,0,0,0,0,0,0,nil,nil};
 bool showchange=false;
 
-/*  COMMONS  */
-
 static
-STBASE  *winfreebase=nil;
-OBJECT  *Title=nil;
-
-/* Trying to locate memory corruption */
-VpI CH;
-
+STBASE * winfreebase=nil;
+#if defined MNTITEL || defined OKTstatic
+OBJECT * Title = nil;
+#endif
 
 #if 0
 static long dl;
@@ -149,14 +149,44 @@ void moves_up(void)	/* never call this, but must create a ref!!!!!!!!!! */
 	UP
 	UP
 	UP
+
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
+	UP
 }
 #endif
-
-void f_txt(short hs,short x,short y,char *text)
-{
-	x&=0xfff8;
-	v_gtext(abs(hs),x,y,text);
-}
 
 global
 char *frstr(short ob)
@@ -288,10 +318,10 @@ void start_help(char *word)		/* triggered by HELP key */
 		buf.s.l = 0;
 		ac = appl_write(ac,sizeof(buf.s),buf.b);
 		if (!ac)
-			alertm(frstr(HELPFAIL));
+			alert_text(frstr(HELPFAIL));
 	}
 	else
-		alertm("%s -=%s=-", frstr(NOGUIDE), frstr(GUIDENAME));
+		alert_text("%s -=%s=-", frstr(NOGUIDE), frstr(GUIDENAME));
 }
 #endif
 
@@ -343,6 +373,7 @@ XA_report punit
 	}
 }
 
+
 global
 short eruit(short r)
 {
@@ -350,6 +381,16 @@ short eruit(short r)
 
 	if (r ne 2)
 	{
+		VpV end_drop, end_buf;	/* 07'20 HR: v6 */
+
+	#if DROPWIN
+		end_drop();
+	#endif
+
+	#ifdef MNBUF
+		end_buf ();
+	#endif
+
 	#ifdef GEMSHELL
 		end_shell();
 		clear_help_stack();
@@ -357,10 +398,7 @@ short eruit(short r)
 
 	#if TMENU
 		if (cfg.a)
-		{
-			/* CH(9); */
 			save_txtconfig();
-		}
 	#elif BMENU
 		if (cfg.a)
 			save_binconfig();
@@ -405,19 +443,19 @@ short eruit(short r)
 		stmclear(&winbase);				/* for internal security */
 		rsrc_free();
 
-	#if TEXTFILE || BINARY
+	#if TEXTFILE || BINED
 		xfree(deskw.loctab);
 	#endif
 		stmfreeall();
 	}
 
 	XA_free_all(&XA_global_base, -1, -1);
-	v_clsvwk(v_hl);
+	v_clsvwk(virt_handle);
 	appl_exit();
 
-#if AA_LEAK
-	XA_leaked(nil, -1, -1, punit, 1);
-	XA_leaked(&XA_file_base, -1, -1, punit, 2);
+#if 0
+	XA_leaked(nil, -1, -1, punit);
+	XA_leaked(&XA_file_base, -1, -1, punit);
 #endif
 
 	if (r)
@@ -449,10 +487,6 @@ void do_Title(void)
 }
 #endif
 
-
-global
-char prg_name[] = PRGNAME;
-
 #if DROPWIN
 char drop_name[14];
 static
@@ -468,20 +502,20 @@ WINIT drop_winit
 static
 DRAW  drop_draw
 {
-	short dum;
-	vst_height(w->hl,w->points,&dum,&dum,&dum,&dum);
+	short dum, hl = w->vhl;
+	vst_height(hl,w->points,&dum,&dum,&dum,&dum);
 	hidem;
 	if (get_cookie('NVDI',nil))		/* only then it looks good */
 	{
-		gspbox(w->hl,w->wa);
-		vst_effects(w->hl,0x04);
-		v_gtext(w->hl,w->wa.x-half_h(),w->wa.y,drop_name);
+		gspbox(hl,w->wa);
+		vst_effects(hl,0x04);
+		v_gtext(hl,w->wa.x-half_h(),w->wa.y,drop_name);
 	}
 	else
-		v_gtext(w->hl,w->wa.x,w->wa.y,drop_name);
+		v_gtext(hl,w->wa.x,w->wa.y,drop_name);
 	showm;
-	vst_height(w->hl,points,&dum,&dum,&dum,&dum);
-	vst_effects(w->hl,0);
+	vst_height(hl,points,&dum,&dum,&dum,&dum);
+	vst_effects(hl,0);
 }
 static
 MOVED drop_move
@@ -495,9 +529,15 @@ MOVED drop_move
 static
 FCLOSE drop_delete
 {
-	wind_close(w->wh);
-	wind_delete(w->wh);
+	if (w)
+		close_w(w);
 	return true;
+}
+
+static
+VpV end_drop		/* 07'20 HR: v6 */
+{
+	drop_delete(get_it(-1, DROP), true);
 }
 #endif
 
@@ -512,10 +552,11 @@ CFG_LOCAL def_loc =		/* for desk window */
 static
 void set_desk(IT *w)
 {
-	zero(deskw);
+	memset(w, 0, sizeof(IT));
 
+	w->vhl = virt_handle;
 #ifdef AMENU
-	menu_init(&mainmenu,AMENU,v_hl,scr_grect);
+	menu_init(&mainmenu,AMENU);
 	Menu=mainmenu.m;
 	w->menu=&mainmenu;
 #else
@@ -531,7 +572,7 @@ void set_desk(IT *w)
 	wind_calc(WC_WORK,NAME|MOVER, win.x, win.y, win.w, win.h,
 	                       &wwa.x,&wwa.y,&wwa.w,&wwa.h);	/* wa */
 
-	wwa.w = scr_grect.w;
+	wwa.w = screct.w;
 
 	wwv.x=win.x-wwa.x;
 	wwv.y=win.y-wwa.y;
@@ -546,7 +587,6 @@ void set_desk(IT *w)
 	w->points=points;		/* voorlopig absolute mode */
 	w->unit.w=wchar;				/* default unit sizes */
 	w->unit.h=hchar;
-	w->hl=v_hl;
 	w->norm.sz.h=wwa.h/w->unit.h;
 	w->norm.sz.w=wwa.w/w->unit.w;
 
@@ -556,7 +596,7 @@ void set_desk(IT *w)
 
 #if TEXTFILE
 	w->loc = txt_local();
-#elif BINARY
+#elif BINED
 	w->loc = bin_local();
 #elif DIGGER
 	dis_local(w);
@@ -572,16 +612,15 @@ void set_desk(IT *w)
 		unit.w *= 2;
 		unit.h *= 2;
 
-		w = create_IT
-		   (
-			true, "drop", 0 , "", nil,
+		w = create_IT(true,
+			"drop", 0 , "", nil,
 			NAME|MOVER, DROP, nil, nil, nil, nil, 0, drop_winit, nil, nil,
 			drop_draw, nil, nil, nil, nil, nil, nil, nil,
 			drop_delete,nil, nil, nil, nil, nil, nil,
 			drop_move, nil, nil, nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil, 0L,
-			unit, deskw.points*2,
-			nil
+			unit, -1, deskw.points*2,
+			MINMARGIN, nil
 		   );
 		if (w)
 		{
@@ -598,17 +637,39 @@ void set_desk(IT *w)
 #endif
 }
 
+#ifdef SOPT
+void init_scrap(OBJECT *Clip)
+{
+	if (Clip)
+	{
+		if (!(Clip->state & DISABLED))
+		{
+			have_scrap = get_scrapdir();	/* establish clipboard directory */
+			if (have_scrap and cfg.s)
+				buf_to_scrap();
+		othw
+			Clip->state &= ~CHECKED;
+			cfg.s = false;
+		}
+	}
+	else
+		alert_text("No Clip");
+}
+
+#endif
+
 static
-void init_subsystems(short argc, char *argv[])
+void init_subsystems(short hl, short argc, char *argv[])
 {
 	VpV spmm;
 	short ax,ay;
-	vsf_interior (v_hl,FIS_SOLID);
-	vsf_style    (v_hl,0);
-	vsf_color    (v_hl,0);
-	vst_color    (v_hl,1);
-	vsf_perimeter(v_hl,0);
-	vst_alignment(v_hl,0, 5, &ax, &ay);	/* 5 = top line */
+	vsf_interior (hl,FIS_SOLID);
+	vsf_style    (hl,0);
+	vsf_color    (hl,0);
+	vst_color    (hl,1);
+	vsf_perimeter(hl,0);
+	vst_alignment(hl,0, 5, &ax, &ay);	/* 5 = top line */
+	gsclip		 (hl,1,screct);
 
 	nkc_init();
 
@@ -620,6 +681,7 @@ void init_subsystems(short argc, char *argv[])
 		form_alert(1, "[3][Geen resource!!][ Ach ]");
 		eruit(2);
 	}
+
 #ifdef TITEL
 	rsrc_gaddr(0,TITEL,&Title);		/* In dialogue, not journal */
 	Title->x=8;
@@ -638,7 +700,6 @@ void init_subsystems(short argc, char *argv[])
 	}
 	#endif
 #endif
-
 
 #ifdef MNASSEMF
 	#if !BIP_ASM
@@ -660,7 +721,9 @@ void init_subsystems(short argc, char *argv[])
 	{
 		strupr(Menu[MNC].spec.free_string);
 		strupr(Menu[MNH].spec.free_string);
+#if MNS
 		strupr(Menu[MNS].spec.free_string);
+#endif
 		strupr(Menu[MNP].spec.free_string);
 	}
 #endif
@@ -669,32 +732,29 @@ void init_subsystems(short argc, char *argv[])
 		menu_bar(Menu,true);
 
 #ifdef MMENU
-	menu_init(&mmen,MMENU,v_hl,scr_grect);
+	menu_init(&mmen,MMENU);
 #endif
 #ifdef TMENU
-	menu_init(&tmen,TMENU,v_hl,scr_grect);
+	menu_init(&tmen,TMENU);
 	#ifdef MTREPAIRNOT
 		tmen.m[MTREPAIRNOT].state |= DISABLED;
 		*tmen.m[MTREPAIRNOT].spec.free_string = 0;
 	#endif
 #endif
 # ifdef DMENU
-	menu_init(&dmen,DMENU,v_hl,scr_grect);
-# endif
-# ifdef FMENU
-	menu_init(&fmen,FMENU,v_hl,scr_grect);
+	menu_init(&dmen,DMENU);
 # endif
 #ifdef JOURNAL
-	menu_init(&jmen,JOURNAL,v_hl,scr_grect);
+	menu_init(&jmen,JOURNAL);
 #endif
 #ifdef OMENU
-	menu_init(&dmen,OMENU,v_hl,scr_grect);
+	menu_init(&dmen,OMENU);
 #endif
 #ifdef BMENU
-	menu_init(&bmen,BMENU,v_hl,scr_grect);
+	menu_init(&bmen,BMENU);
 #endif
 #ifdef CMENU
-	menu_init(&cmen,CMENU,v_hl,scr_grect);
+	menu_init(&cmen,CMENU);
 #endif
 
 #if BIP_CC
@@ -704,7 +764,7 @@ void init_subsystems(short argc, char *argv[])
 #endif
 
 #ifdef FILES
-	init_dir(1);		/* 1 = GEM */
+	init_dir(1, PRGNAME);		/* 1 = GEM */
 #endif
 
 #ifdef MTSEARCH		/* text viewer/editor */
@@ -756,19 +816,17 @@ void init_subsystems(short argc, char *argv[])
    BUT after init_files: if the latter opens any window,
    open_jrnl is suppressed if not allready opened by a object
 */
-	#if FSVIEW
-		fs_init();
-	#endif
 	{
 		extern char *argmake;
 		void init_make(char *);
 		VpV init_dictionary;
+
 		menu_prj_l = strlen(Menu[MTPRJ].spec.free_string);
 #ifdef JOURNAL
 		if (!get_it(-1,JRNL))
 			init_jrnl(&shell_msg, dial_find, 0);		/* (0; 1=full size) */
 #endif
-#if BIP_CC && __COLDFIRE__
+#if BIP_CC
 		init_dictionary();
 #endif
 		init_make(argmake);
@@ -797,10 +855,12 @@ void init_subsystems(short argc, char *argv[])
 	}
 #endif
 
-/*	CH(1); */
+#ifdef SOPT
+	init_scrap(Menu+SOPT);
+#endif
 }
 
-#if 0 /* def __LINEA__ */
+#ifdef __LINEA__
 void font_info(FONT_HDR *sys,char *opm)
 {
 	short sf,fprop,a[5];
@@ -852,12 +912,6 @@ void ddclose(short fd)
 
 #define DBGDROP 0
 
-#if DBGDROP
-#define	DPD(x) v_gtext(v_hl,640,1,x);
-#else
-#define	DPD(x)
-#endif
-
 static
 void do_drop(short mp[])
 {
@@ -868,14 +922,12 @@ void do_drop(short mp[])
 	long size; bool gotit = false;
 
 
-DPD("stage 00  ")
 	memset(noexts, 0, sizeof(noexts));
 	pipename[17] = mp[7] & 0xff;
 	pipename[18] = mp[7] >> 8;
 	fd = Fopen(pipename, 2);
 	if (fd > 0)
 	{
-DPD("stage 0   ")
 		noexts[0] = DD_OK;
 		strcpy(noexts+1, args);
 		oldpipesig = Psignal(SIGPIPE, SIG_IGN);
@@ -883,24 +935,19 @@ DPD("stage 0   ")
 		if (i eq DD_EXTSIZE+1)
 		{
 			short hdrlen; char naam[DD_NAMEMAX+2];
-DPD("stage 1   ")
 			i = Fread(fd, 2L, &hdrlen);
 			if (i eq 2)
 			{
-DPD("stage 2   ")
 				i = Fread(fd, 4, ext);	/* read ext */
 				if (i eq 4)
 				{
-DPD("stage 3   ")
 					ext[4]=0;
 					if (strcmp(ext,args) eq 0)
 					{
-DPD("stage 4   ")
 						i = Fread(fd, 4L, &size);
 						if (i eq 4)
 						{
 
-DPD("stage 5   ")
 							hdrlen-=8;
 							if (hdrlen > DD_NAMEMAX)
 								i = DD_NAMEMAX;
@@ -909,9 +956,8 @@ DPD("stage 5   ")
 
 							if (Fread(fd, i, naam) eq i)
 							{
-DPD("stage 5   ")
 								hdrlen -= i;
-								naam[i]=0;
+								naam[i] = 0;
 							/* skip any extra header (future use) */
 								while (hdrlen > DD_NAMEMAX)
 								{
@@ -995,7 +1041,7 @@ DPD("stage 5   ")
 					if ( (fl=Fopen(t,0)) > 0)
 						open_mandel(t,fl,nil);
 				}
-#elif BINARY
+#elif BINED
 				{
 					long fl;
 					if ( (fl=Fopen(t,0)) > 0)
@@ -1196,9 +1242,13 @@ void main(short argc, char *argv[])
 	short kcode,mx,my,button,kstate,bclicks,mn,mt,mp[8];
 	static bool w_on=false;
 
+	strcpy(prg_name, PRGNAME);	/* 11'20 HR: v6 */ 
+	
+	aaaa_id = appl_init();
+/*	form_error(4);	for testing cdecl -*/
+
 	XA_set_base(nil, XA_TCHUNK, 13, 0, nil, nil);
 
-	aaaa_id = appl_init();
 #ifdef UP
 	ddl = moves_up;	/*	creates the ref, but does not do anything */
 #endif
@@ -1207,15 +1257,15 @@ void main(short argc, char *argv[])
 
 	{
 		short dum,effects[3],d[5];
-		v_hl = instt_scr();			/* also sets global phys_handle and virt_handle */
-		vqt_fontinfo(v_hl,&dum,&dum,d,&dum,effects);
+		instt_scr();			/* sets global physical handle and virtual handle */
+		vqt_fontinfo(virt_handle,&dum,&dum,d,&dum,effects);
 		points=d[4];	/* celltop to baseline */
 
 	/* --------------------------- TEST, leuk!! ----------------- */
 	/*	points=26;												  */
 	/* ---------------------------------------------------------- */
 
-		vst_height(v_hl,points,&dum,&points,&wchar,&hchar);
+		vst_height(virt_handle,points,&dum,&points,&wchar,&hchar);
 		hpoints=points/2;
 		aes_flags = get_aes_info(aes_global.version,&aes_font,&aes_font_height,&dum,&dum);
 	}
@@ -1227,11 +1277,14 @@ void main(short argc, char *argv[])
 	if (MagX or MiNT)
 		global_message = XA_alloc(&XA_global_base, DIR_MAX*2+1, nil, -1, -1);
 
-	init_subsystems(argc,argv);
+	init_subsystems(virt_handle, argc, argv);
+
 #ifdef UP
 send_msg("With code move up\n");
 #endif
+
 	marrow();
+
 	do						/* THE and the ONLY one  event loop */
 	{
 		static short lastwin = -1;
@@ -1378,11 +1431,6 @@ send_msg("With code move up\n");
 			if (is_mkey(wt,kcode))
 			{
 				key=m_key(kcode);
-	#ifdef MFRAC
-				if (wt and wt->overscan)	/* cant use the menu's */
-					mn = 0;
-				else
-	#endif
 				{
 	#ifdef WMENU
 					if (wt and wt->do_menu and (mn=menu_keys(wt->menu,key,&mt)) ne 0)

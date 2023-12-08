@@ -41,11 +41,12 @@ typedef struct cache
 
 extern CP cache;
 
+void	init_cache		(void);
 void	free_cache		(void);
 void	delete_from_cache(Cstr name, short caching);
 CP		free_cache_unit	(CP);
 CP		new_cache		(void);
-CP		cache_look		(short which, CP pt, CP *pr, Cstr name, bool new);
+CP		cache_look		(CP pt, CP *pr, Cstr name, bool new);
 CP		cache_fits		(long size);
 CP		cache_high		(long size);
 

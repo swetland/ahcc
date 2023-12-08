@@ -125,7 +125,7 @@ void		hn_show	(HI_NAME *hn);
 void		hn_free	(HI_NAME *hn);
 bool		hn_chext(HI_NAME *hn, char *newx);
 void		hn_dotdot		(char *out, Cstr sep, short xmax);
-void		init_dir		(short);
+void		init_dir		(short, Cstr pr);
 S_path		dir_plus_name	(S_path *pad, Cstr f);
 char *	 	strslash		(Cstr s);
 char *	 	strrslash		(Cstr s);

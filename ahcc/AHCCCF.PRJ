@@ -8,38 +8,39 @@ shell\ahcccf.prg
 ; configuration
 .C [-DRSRC_H="shell/ahcc.h" -DRSRC_RSC="ahcc.rsc"]
 .C [-DPRGNAME="AHCCCF"]
+.C [-DCVERSION="6.0"]
 
 .C [-DGEMSHELL=1]
-
-.C [-DC99=0]			; Preliminary C99 support.
-.C [-DBIP_CC=1 -DBIP_LD=1 -DBIP_ASM=1]
 .C [-DFU_TREE=1]
-.C [-DFOR_A=0]			; Algol64 syntax
+
+.C [-DBIP_CC=1 -DBIP_LD=1 -DBIP_ASM=1]
 .C [-DLL=0]			; allow long long (not finished yet :-)
+; LL: for now never, future: linked to C99
+
+.C [-DFOR_A=0]			; More like Algol
 .C [-DFLOAT=1]			; floating point support
 .C [-DCOLDFIRE=1]		; Coldfire v4e support
-.C [-DQUAL=1]
-
 .C [-DROTOP=0]			; <> >< (rol,ror) ROTate OPerators, else __ROL__ and __ROR__
+.C [-DBOFFS=1]			; built_in offsetof
+.C [-DOFFS=1]			; Pure C style offsetof
 
 ; debugging
-.C [-DAA_LEAK=0 -DCC_LEAK=1]	; report memory leaks (ahcm)
-.C [-DLOST_NODES=0]
-.C [-DOPTBUG=0 -DPCNT_SAMPLE=0]
-.C [-DDEBUG=0]			; shell/editor/prj debugging
+.C [-DLOST_NODES=0]		; display lost nodes
+.C [-DOPTBUG=0 -DPCNT_SAMPLE=0]	; optimizer debugging
 .C [-DC_DEBUG=0]		; comp/asm/ld debugging
-.C [-DWAIT=0]			; wait after error, warning or message or journal
+.C [-DDEBUG=0]			; shell/editor/prj debugging
 .C [-DPRLN=0]			; #pragma prln (a option because it calls print_node)
 .C [-DDBGFR=0]			; Debug freeing free nodes (ptrs & const's)
 .C [-DDBGLN=0]			; Signal lost nodes
 
 .C [-27 -8]
-
 .C [-A- -Y- -H- -K-]
 .C [-C -M -P]
 
 .L [-S=32768]			; loads of recursion in compiler, but also multiple search (2 132 byte strings)
+
 =
+
 ahcstart.o
 
 aaaa.c					; main
@@ -47,6 +48,7 @@ aaaa.c					; main
 text\text.c
 text\cursor.c
 text\editor.c		(text\fkeytxt.h)
+text\buffer.c
 text\text_cfg.c
 text\text_sel.c
 
@@ -74,6 +76,7 @@ common\aaaa_lib.c
 common\dict.c
 common\ipff.c
 common\pdb.c
+common\cmpl.s
 
 shell\gemshell.c	(shell\shell.h)						; GEM shell
 shell\shell.c		(shell\shell.h,ahcc\peepstat.h)		; shell's make
@@ -81,7 +84,6 @@ shell\shlcfg.c		(shell\shell.h)
 shell\tos_call.s		; passes parameters argc & argv to module
 						; in stead of program
 shell\bip_io.c
-; shell\fs.c			; test treeview
 
 ; compiler
 ahcc\init_cc.c			; initialize variables
@@ -103,7 +105,6 @@ ahcc\g2.c			(ahcc\code.h)
 ahcc\gsub.c
 ahcc\md.c
 ahcc\nodes.c
-ahcc\cmpl.s
 ahcc\out.c
 ahcc\d80tod64.s
 ; ahccstd\ll.s		; if LONGLONG
@@ -141,5 +142,4 @@ common\amem.c			; specials
 
 ahccstdf.lib
 ahccgemf.lib
-ahcctos.lib
 

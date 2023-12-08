@@ -80,7 +80,6 @@ bool make_visible(IT *w,CINF vi, bool top)
 			l2+=ls;
 	}
 
-
 	if (	vi.scrx <  w->norm.pos.x
 		or  vi.scrx >= w->norm.pos.x + w->norm.sz.w)
 	{
@@ -98,7 +97,7 @@ bool make_visible(IT *w,CINF vi, bool top)
 		draw |= true;
 		w->norm.pos.y = bounce(w,vi.pos.y-(w->norm.sz.h-ls)/2);	/* put in the middle */
 	}
-		
+
 	if (!top)
 		if (get_top_it() ne w)
 			draw |= true, wind_set(w->wh, WF_TOP);
@@ -114,15 +113,19 @@ bool make_visible(IT *w,CINF vi, bool top)
 global
 bool make_vis_cur(IT *w)
 {
+	bool ret;
 	w->vc.pos.y = w->cu.pos.y;		/* start point for next do_ficu() */
-	return make_visible(w,w->cu,false);	/* check on top */
+	ret = make_visible(w,w->cu,false);	/* check on top */
+	return ret;
 }
 
 global
 bool make_vis_top(IT *w)
 {
+	bool ret;
 	w->vc.pos.y = w->cu.pos.y;		/* start point for next do_ficu() */
-	return make_visible(w,w->cu,true);	/* already on top */
+	ret = make_visible(w,w->cu,true);	/* already on top */
+	return ret;
 }
 
 global
@@ -140,8 +143,15 @@ void write_curect(short hl, short pxy[])
 global
 void xy_to_unit(IT *w, short mx, short my, long *pbx, long *pby)
 {
-	*pbx = (mx - w->ma.x) / w->unit.w + w->norm.pos.x;
-	*pby = (my - w->ma.y) / w->unit.h + w->norm.pos.y;
+	short x, y;
+	x = (mx - w->ma.x) / w->unit.w + w->norm.pos.x;
+	y = (my - w->ma.y) / w->unit.h + w->norm.pos.y;
+	if (x >= w->view.sz.w)
+		x  = w->view.sz.w-1;
+	if (y >= w->view.sz.h)
+		y  = w->view.sz.h-1;
+	*pbx = x;
+	*pby = y;
 }
 
 global
@@ -216,7 +226,7 @@ bool write_cur(IT *w, CINF cu)		/* top left pos: 0,0 */
 		c[1]+=w->h-1;
 		c[3]+=1;
 	#endif
-		write_curect(w->hl, c);
+		write_curect(w->vhl, c);
 		return true;
 	}
 	else
@@ -304,14 +314,16 @@ bool do_std_cursor(IT *w,short kcode)		/* kcode is < 0 !! */
 		cur_off(w);
 		w->cu.scrx--;
 		if (w->upd_cinf)
+		{
 			if ((*w->upd_cinf)(w, w->cu.pos.y, w->cu.scrx, &w->cu, LOW))
 			{
 				make_vis_top(w);
 				return true;
 			}
+		}
 		w->cu.scrx = 0;
 		if (w->cu.pos.y > 0)
-			w->cu.updn = w->view.sz.w;
+			w->cu.updn = w->view.sz.w - 1;
 		else
 			w->cu.updn = 0;
 	fall_thru  						/* if scroll */

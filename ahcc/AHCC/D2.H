@@ -73,6 +73,6 @@ short	default_class(void),
 		similar_type(short lvl, short q, TP a, TP b, short proty, short context);
 void	loc_advice	(TP, NP);
 void	set_vreg	(TP);
-void	permanent_var(short, TP, short);
+void	permanent_var(TP, short class);
 bool	can_pu		(TP);
 NP 		e_temp_var	(TP type);

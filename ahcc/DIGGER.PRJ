@@ -5,7 +5,7 @@ digger\digger.prg
 .C [-DRSRC_H="DIGGER\DIGGER.H"]
 .C [-DRSRC_RSC="DIGGER.RSC"]
 .C [-DPRGNAME="Digger"]
-.C [-DVERSION="V8.3+"]
+.C [-DVERSION="V8.4"]
 .C [-DXA_LEAK=0]			; AHCM memory leak detection
 .C [-2- -8-]
 .C [-W-par -W-stv -W-sig -W-cln]	; warning level must be 2 !!
@@ -52,6 +52,7 @@ common\options.c
 common\windows.c
 common\wdial.c			; window dialogue handling
 common\journal.c
+common\scrap.c			; 14'17 v8.4 [GS]
 common\msgbuf.c
 common\config.c
 common\stm.c			; chain manager

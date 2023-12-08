@@ -91,7 +91,7 @@ BpV		is_all,
 		is_deep,
 		is_once;
 short 	find_type		(IT *,short);
-VpV		invoke_kit,
+VpV 	invoke_kit,
 		end_kit,
 		kit_for_shell,
 		reverse_rich,

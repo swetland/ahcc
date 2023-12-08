@@ -20,7 +20,7 @@
 
 #include "aespb.h"
 
-short G_decl wind_create(short kind, short x, short y, short w, short h)
+short  wind_create(short kind, short x, short y, short w, short h)
 {
 	short ii[5], io;
 	SETACTL(100, 5, 1, 0, 0);
@@ -30,7 +30,7 @@ short G_decl wind_create(short kind, short x, short y, short w, short h)
 	return io;
 }
 
-short G_decl wind_open(short whl, short x, short y, short w, short h)
+short  wind_open(short whl, short x, short y, short w, short h)
 {
 	short ii[5], io;
 	SETACTL(101, 5, 1, 0, 0);
@@ -40,7 +40,7 @@ short G_decl wind_open(short whl, short x, short y, short w, short h)
 	return io;
 }
 
-short G_decl wind_close(short whl)
+short  wind_close(short whl)
 {
 	short io;
 	SETACTL(102, 1, 1, 0, 0);
@@ -49,7 +49,7 @@ short G_decl wind_close(short whl)
 	return io;
 }
 
-short G_decl wind_delete(short whl)
+short  wind_delete(short whl)
 {
 	short io;
 	SETACTL(103, 1, 1, 0, 0);
@@ -91,7 +91,7 @@ unsigned char wind_get_table[] =
     0,0,0,0,0,0,0,0
 };
 
-short G_decl wind_get_nargs(short field)
+short  wind_get_nargs(short field)
 {
 	if(field > 0 && field < sizeof(wind_get_table))
 		return wind_get_table[field];
@@ -99,7 +99,7 @@ short G_decl wind_get_nargs(short field)
 		return 4;
 }
 
-short G_decl wind_get(short whl, short srt, ...)	/* in assembler */
+short  wind_get(short whl, short srt, ...)	/* in assembler */
 {
 	va_list a;
 	short io[5], ii[3], *w, i, j;
@@ -129,7 +129,7 @@ short G_decl wind_get(short whl, short srt, ...)	/* in assembler */
 	return io[0];
 }
 
-short G_decl wind_set(short whl, short srt, ...)	/* in assembler */
+short  wind_set(short whl, short srt, ...)	/* in assembler */
 {
 	va_list a;
 	short ii[6], io;
@@ -150,9 +150,9 @@ short G_decl wind_set(short whl, short srt, ...)	/* in assembler */
 
 #if SMURF
 #if !__WGS_ELLIPSISD__
-short G_decl wind_get
+short  wind_get
 #else
-short G_decl SM_wind_get
+short  SM_wind_get
 #endif
         (short whl, short srt, short *w1, short *w2, short *w3, short *w4)
 {
@@ -175,9 +175,9 @@ short G_decl SM_wind_get
 }
 
 #if ! __WGS_ELLIPSISD__
-short G_decl wind_set
+short  wind_set
 #else
-short G_decl SM_wind_set
+short  SM_wind_set
 #endif
         (short whl, short srt,
                short x, short y, short w, short h)
@@ -196,7 +196,7 @@ short G_decl SM_wind_set
 }
 #endif
 
-short G_decl wind_find(short x, short y)
+short  wind_find(short x, short y)
 {
 	short ii[2], io;
 	SETACTL(106, 2, 1, 0, 0);
@@ -206,7 +206,7 @@ short G_decl wind_find(short x, short y)
 	return io;
 }
 
-short G_decl wind_update(short begend)
+short  wind_update(short begend)
 {
 	short io;
 	SETACTL(107, 1, 1, 0, 0);
@@ -215,7 +215,7 @@ short G_decl wind_update(short begend)
 	return io;
 }
 
-short G_decl wind_calc(short ty, short srt,
+short  wind_calc(short ty, short srt,
                             short   x, short   y, short   w, short   h,
                             short *bx, short *by, short *bw, short *bh)
 {
@@ -231,7 +231,7 @@ short G_decl wind_calc(short ty, short srt,
 	return io[0];
 }
 
-short G_decl wind_new(void)
+short  wind_new(void)
 {
 	short io;
 	SETACTL(109, 0, 1, 0, 0);

@@ -16,13 +16,14 @@
 #define MNTILE           28  /* STRING in Baum AMENU */
 #define MNOVLAP          29  /* STRING in Baum AMENU */
 #define MNCYCL           30  /* STRING in Baum AMENU */
-#define MNBUF            32  /* STRING in Baum AMENU */
-#define MNMULT           34  /* STRING in Baum AMENU */
-#define MNFCOMP          35  /* STRING in Baum AMENU */
-#define MNHOOKS          36  /* STRING in Baum AMENU */
-#define RTUN             38  /* STRING in Baum AMENU */
-#define AOPT             39  /* STRING in Baum AMENU */
-#define HELP             40  /* STRING in Baum AMENU */
+#define SOPT             32  /* STRING in Baum AMENU */
+#define MNBUF            33  /* STRING in Baum AMENU */
+#define MNMULT           35  /* STRING in Baum AMENU */
+#define MNFCOMP          36  /* STRING in Baum AMENU */
+#define MNHOOKS          37  /* STRING in Baum AMENU */
+#define RTUN             39  /* STRING in Baum AMENU */
+#define AOPT             40  /* STRING in Baum AMENU */
+#define HELP             41  /* STRING in Baum AMENU */
 
 #define TMENU            1   /* Menuebaum */
 #define MTT1             3   /* TITLE in Baum TMENU */

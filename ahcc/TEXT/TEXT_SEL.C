@@ -23,7 +23,6 @@
 
 #include <ctype.h>
 #include <string.h>
-
 #include "common/aaaa_lib.h"
 #include "common/hierarch.h"
 
@@ -39,7 +38,7 @@ global
 XSELECT text_wselect /*   *w,CINF *css,CINF *cse, STMNR top, STMNR bot  */
 					 /*             start  -   end        van   -    tot  */
 {
-	short hl = w->hl;
+	short hl = w->vhl;
 	short color = w->color;	/* NB!!!! color other than BLACK does not work well with vswr_mode(3) */
 	STMNR sl, el;
 	short
@@ -629,7 +628,8 @@ bool is_lw_nest(short selty)	{ return selty >  TY_WH      and selty <= TY_WH+N_W
 static
 bool is_rw_nest(short selty)	{ return selty >  TY_WH+N_WH and selty <  TY_WH+HIGH_WH; }
 
-globalbool select_line(IT *w, STMNR y)
+global
+bool select_line(IT *w, STMNR y)
 {
 	w->ss = c1st;
 	w->se = c1st;
@@ -645,7 +645,8 @@ globalbool select_line(IT *w, STMNR y)
 	return true;
 }
 
-globalbool set_line(IT *w, CINF *ss, CINF *se)
+global
+bool set_line(IT *w, CINF *ss, CINF *se)
 {
 	STMNR y = w->cu.pos.y;
 	*ss = c1st;
@@ -983,7 +984,7 @@ bool txtsel_cursor(IT *w,short kcode)		/* kcode is < 0 !! */
 			if (w->cu.pos.y eq w->norm.pos.y)
 				(*w->arrowd)(w,WA_UPLINE, true);
 			cur_off(w);
-			t_to_s_x(w, w->cu.pos.y ,w->cu.updn, &w->cu, LOW);
+			t_to_s_x(w,w->cu.pos.y ,w->cu.updn, &w->cu, LOW);
 			make_vis_top(w);
 		}
 	return true;
@@ -1091,7 +1092,7 @@ BUTTON txtsel_button		/* w,button,kstate,bclicks,mx,my */
 	wind_update(BEG_MCTRL);
 
 #if DRAGSELECTION
-	if (    !w->drag 
+	if (    !w->drag
 	    or  (w->drag and ! w->drag(w, button, kstate, bclicks, mx, my))
 	   )
 #endif

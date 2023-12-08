@@ -53,7 +53,7 @@ ipeep3(BP bp, IP i1)
 	OPMODE am;
 
 	MO(am) = NONE;
-	
+
 	if (i1->arg)
 	{
 		am   = i1->arg->am;
@@ -191,6 +191,7 @@ ipeep3(BP bp, IP i1)
 	             or arg2->disp eq DOT_W
 	             or arg2->disp eq DOT_L
 	             or arg2->disp eq DOT_D
+	             or arg2->disp eq DOT_S
 	             or arg2->disp eq DOT_X
 	            )
 		   )

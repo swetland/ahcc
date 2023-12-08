@@ -57,6 +57,15 @@ void next_blad(void)
 #endif
 
 global
+void c_mods(void *to, void *fro)
+{
+	NP np = to, tp = fro;
+
+	np->xflgs.f.pasc |= tp->xflgs.f.pasc;
+	np->xflgs.f.cdec |= tp->xflgs.f.cdec;
+}
+
+global
 short nodesmade = 0, nodesavail = 0;
 
 #define zeroize(xp) *((long*)xp)++ = 0
@@ -349,7 +358,7 @@ bool check_free(void *vp, short ty,
 		warn("CW: free%cnode on no %cnode [%s]%d %s, fileno %d line %ld", ty, ty,
 			pntype(np->nt), np->nt, ptok(np->token), np->fl.n, np->fl.ln);
 #endif
-		if (np->token eq ID)	send_msg("\t\t%s\n", np->name);
+		if (np->token eq ID)	console("\t\t%s\n", np->name);
 		return true;
 	}
 
@@ -1370,15 +1379,14 @@ bool same_q(TP tp, short q)
 	return  q eq nq;
 }
 
-TP qualify(TP op, short which, short lvl)
+TP qualify(TP op)
 {
 	TP tp = allocTn(0);
 	if (tp)
 	{
 		*tp = *op;			/* do the copy */
 		tp->nflgs.f.res   = 0;
-/*		tp->nflgs.f.bas   = 0;
-*/		tp->nflgs.f.nheap = 0;
+		tp->nflgs.f.nheap = 0;
 		tp->cflgs.f.q     = 1;
 		op->tflgs.f.qd    = 1;
 		#if NODESTATS
@@ -1390,7 +1398,7 @@ TP qualify(TP op, short which, short lvl)
 }
 
 global
-TP qualify_type(TP op , short q, short which, short lvl)	/* Designed for qualification of types */
+TP qualify_type(TP op , short q)	/* Designed for qualification of types */
 {
 
 	TP np = nil, last = nil, tp;
@@ -1400,13 +1408,13 @@ TP qualify_type(TP op , short q, short which, short lvl)	/* Designed for qualifi
 		if (op->tflgs.f.qd)	return np;
 
 		/* make the copy */
-		tp = qualify(op, which, lvl);								/* equiv tdata */
+		tp = qualify(op);								/* equiv tdata */
 
 		if (tp->nflgs.f.brk_l)
 			tp->next = nil;		/* Disconnect from (symbol) tables */
 
-		tp->next = qualify_type(tp->next, q, 2, lvl+1);
-		tp->list = qualify_type(tp->list, q, 1, lvl+1);
+		tp->next = qualify_type(tp->next, q);
+		tp->list = qualify_type(tp->list, q);
 
 		pick_qual(tp, q);
 		putt_fifo(&np, &last, tp);
@@ -1715,6 +1723,7 @@ __ll getlcon(NP np)
 }
 #endif
 
+#if MTREE
 global
 NP make_tree(Cstr *t)	/* t is template */
 {
@@ -1760,3 +1769,4 @@ NP make_tree(Cstr *t)	/* t is template */
 	}
 	return np;
 }
+#endif

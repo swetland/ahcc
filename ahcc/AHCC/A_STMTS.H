@@ -35,7 +35,7 @@ void if_stmt(VP back)
 		new_scope(K_IF, "if{");
 		loc_decls();
 	}
-	l1 = new_albl(4);
+	l1 = new_lbl();
 	e1 = need_expr();
 	new_gp(e1, EX1);
 	gen_boolean(e1, l1, for_FALSE);
@@ -48,27 +48,28 @@ void if_stmt(VP back)
 	{
 		D_(S, "ELIF");
 
-		l2 = new_albl(5);
+		l2 = new_lbl();
 		flow->F.out = new_out(flow, "elif");
 		out_br(l2);
-		def_albl(l1, 2);
+
+		def_lbl(l1);
 		if_stmt(flow);
-		def_albl(l2, 3);
+		def_lbl(l2);
 	}
 	elif (cur->token eq K_ELSE)
 	{
 		D_(S, "ELSE");
 
 		fadvnode();
-		l2 = new_albl(6);
+		l2 = new_lbl();
 		flow->F.out = new_out(flow, "else");
 		out_br(l2);
-		def_albl(l1, 4);
+		def_lbl(l1);
 		phrase(flow->F.out, K_ELSE);
-		def_albl(l2, 5);
+		def_lbl(l2);
 		eat(K_FI);		/* only eat fi when no elif */
 	othw
-		def_albl(l1, 6);
+		def_lbl(l1);
 		eat(K_FI);		/* only eat fi when no elif */
 	}
 
@@ -256,7 +257,7 @@ bool do_stmt(VP back, LOOP_CONTROL *lc)
 		eat(K_OD);
 	}
 
-	def_albl(lc->loop_continue, 7);
+	def_lbl(lc->loop_continue);
 
 	if (!G.nmerrors)
 	{
@@ -286,7 +287,7 @@ bool do_stmt(VP back, LOOP_CONTROL *lc)
 			out_loop_inc(lc_name);
 #endif
 		out_br (lc->loop_back);
-		def_albl(lc->loop_break, 8);
+		def_lbl(lc->loop_break);
 
 #if LOOPCOUNT
 		if (lc->returns)
@@ -317,8 +318,8 @@ bool case_stmt(VP back)
 
 	D_(S, "CASE");
 	fadvnode();
-	l1 = new_albl(7);		/* esac lable */
-	l2 = new_albl(8);		/* branch over code for choices */
+	l1 = new_lbl();		/* esac lable */
+	l2 = new_lbl();		/* branch over code for choices */
 	swit = new_unit(back, cur, K_SWITCH);
 	swit->inner = new_in(swit, "case", -1, -1);	/* no break's for this kind of statement */
 	swit->inner->FF.root = swit;
@@ -344,7 +345,7 @@ bool case_stmt(VP back)
 	{
 		fadvnode();
 		do{				/* process choices separated by COMMA */
-			lb = new_albl(9);
+			lb = new_lbl();
 			do{			/* process constant expressions followed by 1 LABEL */
 				VP new = new_case(flow, l1);
 				cp = assignx();		/* no COMMA's */
@@ -357,7 +358,7 @@ bool case_stmt(VP back)
 				fadvnode();
 			} while (cur_ne(LABEL));
 			eat(LABEL);
-			def_albl(lb, 9);
+			def_lbl(lb);
 			unit(flow, K_THEN);
 			out_br(l1);			/* no fall thru: always break */
 			if (cur->token ne COMMA)
@@ -368,11 +369,11 @@ bool case_stmt(VP back)
 		eat(K_THEN);
 		do{				/* process choices seperated by COMMA */
 			VP new = new_case(flow, l1);
-			lb = new_albl(10);
+			lb = new_lbl();
 			new->vval = staffel++;		/* enumerate */
 			add_case(swit, new->vval, lb);
 			G.fltab = new;
-			def_albl(lb, 10);
+			def_lbl(lb);
 			unit(flow, K_THEN);
 			out_br(l1);			/* no fall thru: always break */
 			if (cur->token ne COMMA)
@@ -384,14 +385,14 @@ bool case_stmt(VP back)
 	if (cur->token eq K_ELSE)
 	{
 		fadvnode();
-		lb = new_albl(11);
+		lb = new_lbl();
 		new_default(flow, lb, K_CASE, K_ELSE);
-		def_albl(lb, 11);
+		def_lbl(lb);
 		phrase(flow->F.out, K_ELSE);
 	}
 	add_br_1_2(l1);
 	gen_switch(swit->F.caselist, swit->F.size, swit->F.deflbl);
-	def_albl(l1, 12);
+	def_lbl(l1);
 	G.fltab = swit;
 	eat(K_ESAC);
 	return true;

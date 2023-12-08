@@ -27,24 +27,14 @@
 #include "ahcm.h"
 #include "qmem.h"
 
-#define ANALYSE 0
-
 global
 void * qalloc(MEMBASE *mb, long new)
 {
 	char *ret;
 
 	if (new < 1)
-	{
-#if ANALYSE
-		printf("**** qalloc size < 1 %ld ****\n", new);
-#endif
 		return nil;
-	}
 
-#if ANALYSE
-	ret = XA_alloc(&mb->base, new, nil, -1, -1);
-#else
 	new = (new + 3) & -4;
 
 	if (mb->memorynow + new > mb->chunk)
@@ -60,7 +50,6 @@ void * qalloc(MEMBASE *mb, long new)
 	ret = mb->memory;
 	mb->memory += new;
 	mb->memorynow += new;
-#endif
 	return ret;
 }
 
@@ -70,16 +59,8 @@ void * CC_qalloc(MEMBASE *mb, long new, XA_run_out *ranout, XA_key key)
 	char *ret;
 
 	if (new < 1)
-	{
-#if ANALYSE
-		printf("**** CC_qalloc size < 1 %ld ****\n", new);
-#endif
 		return nil;
-	}
 
-#if ANALYSE
-	ret = XA_alloc(&mb->base, new, ranout, key, -1);
-#else
 	new = (new + 3) & -4;
 
 	if (mb->memorynow + new > mb->chunk)
@@ -91,7 +72,6 @@ void * CC_qalloc(MEMBASE *mb, long new, XA_run_out *ranout, XA_key key)
 	ret = mb->memory;
 	mb->memory += new;
 	mb->memorynow += new;
-#endif
 	return ret;
 }
 

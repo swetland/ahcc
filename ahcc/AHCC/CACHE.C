@@ -32,20 +32,6 @@ global
 CP cache = nil;
 
 global
-void pr_cache(short which)
-{
-	CP ip = cache;
-	send_msg("**** cache ****\n");
-	while (ip)
-	{
-		send_msg("[%d]pr_cache: %lx %6ld %s[%ld] %d\n",
-		           which,       ip, ip->size, ip->name ? ip->name : "~~~", ip->bytes, ip->busy);
-
-		ip = ip->next;
-	}
-}
-
-global
 CP free_cache_unit(CP cp)		/* only last */
 {
 	CP nx = nil;
@@ -67,7 +53,7 @@ global
 void delete_from_cache(Cstr name, short caching)
 {
 	CP pr, nx;
-	CP cp = cache_look(1, cache, &pr, name, false);
+	CP cp = cache_look(cache, &pr, name, false);
 	if (cp)
 	{
 		if (caching)
@@ -100,14 +86,20 @@ void free_cache(void)
 #endif
 }
 
-short alert_text(char *t, ... );
 global
-CP cache_look(short which, CP pt, CP *ppr, Cstr name, bool new)
+void init_cache(void)
+{
+	free_cache();
+	cache = nil;
+}
+
+global
+CP cache_look(CP pt, CP *ppr, Cstr name, bool new)
 {
 	CP pr = nil;
 	while (pt)
 	{
-		if (strcmp(pt->name, name) eq 0)
+		if (SCMP(80,pt->name, name) eq 0)
 		{
 			if (new)
 				pt->busy += 1;
@@ -147,7 +139,7 @@ bool not_busy(CP cp)
 	VP np = G.inctab;
 
 	while (np)
-		if (strcmp(cp->name, G.inctab->name) eq 0)
+		if (SCMP(81,cp->name, G.inctab->name) eq 0)
 			return false;
 		else
 			np = np->next;

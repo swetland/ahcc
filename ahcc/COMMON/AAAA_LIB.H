@@ -17,8 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef AAAA_LIB_H
-#define AAAA_LIB_H
+#ifndef __HR_H
+#define __HR_H
 
 #ifndef PRELUDE_H
 #include <prelude.h>
@@ -26,6 +26,10 @@
 
 #ifndef STDIO_H
 #include <stdio.h>
+#endif
+
+#ifndef CTYPE_H
+#include <ctype.h>
 #endif
 
 #ifndef TOS_GEM_H
@@ -44,7 +48,17 @@
 #include "common/hierarch.h"
 #endif
 
+#ifndef QFI_H
+#include "qfind.h"
+#endif
+
+#ifndef IPFF_H
+#include "ipff.h"
+#endif
+
+#if __PUREC__
 void nop(void) 047161;
+#endif
 
 typedef struct
 {
@@ -70,6 +84,8 @@ typedef struct
 
 bool	loadconfig	(FILE *f,OpEntry *tab, short lvl);
 void	saveconfig	(FILE *f,OpEntry *tab, short lvl);
+void	changeconfig(OpEntry *tab, void *old, void *new);
+OpEntry *copyconfig	(OpEntry *tab, void *old, void *new);
 
 typedef void CFGNEST(FILE *fp, OpEntry **tab, short lvl, short io);
 
@@ -105,8 +121,11 @@ short min(short a, short b);
 
 #define hidem graf_mouse(256, 0x0L)
 #define showm graf_mouse(257, 0x0L)
+#define v_hidem v_hide_c(phys_handle)
+#define v_showm(r) v_show_c(phys_handle,r)
 
 #define mouse(x, y, k, s) graf_mkstate(&x, &y, &k, &s)
+#define muis(x,y,k,s) vq_mouse(phys_handle,&k,&x,&y)
 #define mpijl marrow()
 #define mbumble graf_mouse(2,0x0L)
 #define openkruis graf_mouse(7,0x0L)
@@ -154,7 +173,7 @@ short 	aform_move	(OBJECT *db, short hl, void *area, bool snap,
 void	copy_gform	(short hl, DRBVN pxy, MFDB *schrm, MFDB *dump);
 
 void	movebox		(short hl, RECT *d, PRB *p, short init, void (*rat)(void) );
-void	draw_ob		(OBJECT *ob,short item,RECT cl,short which);
+void	draw_ob		(OBJECT *ob,short item,RECT cl);
 short 	mousek		(void);
 void	mv_rat		(RECT *ps, PRB *p);			/* absolute minimum (denk aan clipping) */
 void	mv_scrrat	(RECT *ps,PRB *p);		/* check against screen without sticking */
@@ -184,6 +203,12 @@ bool  cdecl form_edit  (short hl, char *title, short fs, ...);
 
 short 	get_parent  (OBJECT *tree, short obj);	/* common/parent.s */
 
+typedef struct
+{
+	long id,val;
+} COOKIE;
+
+COOKIE * install_cookie_jar(long n);
 bool	new_cookie	(long cook_id, long cook_val);
 bool	get_cookie	(long cookie,  long *value);
 void	strsncpy	(Wstr dest, Cstr src, long len);	/* secure string copy */
@@ -248,6 +273,12 @@ typedef struct
 	char text[MTX+1];
 } BT;
 
+_CTYPE_c	is_alpha, is_alnum,  /* HR: include underline */
+			is_punct;
+#if MTREE
+_CTYPE_c	is_open, is_close;
+#endif
+
 size_t	rc_count		(OBJECT *tree);
 BT *	rc_get			(OBJECT *tree, size_t *size);
 void	rc_put			(OBJECT *tree, BT *t);
@@ -265,8 +296,15 @@ void	clips		(short,short,short,short,short,short);
 void	gsclip		(short,short,GRECT r);
 void	gline		(short, RECT);
 short	alert_text	(char *t, ... );
+void	alert_32(char *s, char *t);
+short	alert_qtext(bool stop, char *t, ... );
 char *	alert_secure(short max, char *s);
 char *	strtra		(short max, char *d, char *s, char *f);
 void	strrep		(short max, char *s, char *f);
+bool	opposite	(uchar c, bool o);	/* opposite of a brace character <({[]}0> */
 char *	delimited_copy(short max, char *fro, char *to, uchar delim);
+bool	is_inside	(RECT i,RECT o);
+bool	is_outside	(RECT o,RECT i);
+bool	m_inside	(short x,short y,RECT o);
+
 #endif

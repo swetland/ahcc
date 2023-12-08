@@ -24,22 +24,16 @@
 #include <string.h>
 
 #include "common/aaaa_lib.h"
-#include "common/hierarch.h"
-
 #include "aaaa.h"
 #include "common/mallocs.h"
 #include "common/kit.h"
+
 #include "cursor.h"
-#include "common/journal.h"
-#include "common/ipff.h"
 #include "text.h"
-#include "text_sel.h"
 #include "common/cursor.h"
-#include "editor.h"
-#include "common/files.h"
+#include "common/files.h"	/* mainly for write_out() */
 #include "common/ahcm.h"
 
-#define BUFFER_EMPTY
 #define SHOVERFL 5				/* ch's overflow space with shift right */
 
 /*  GLOBALS  */
@@ -48,12 +42,11 @@ OBJECT *edmenu;
 
 #define MAXTABS 20
 
-static
-STMDEF shunt;						/* copy paste buffer */
+STMDEF shunt;					/* copy paste buffer */
 
 #ifdef MNUNDO
 static
-STMDEF oldshunt;			/* and its undo buffer */
+STMDEF oldshunt;				/* and its undo buffer */
 #endif
 
 /*  COMMONS */
@@ -99,7 +92,7 @@ void deletecur(STMDEF *m,STMC *s)
 static
 char cop1[]="while copying";
 
-static
+global
 STMC *copy_1(STMDEF *to,STMC *s,short f,short l,STMACC acc)
 {
 	char *c;
@@ -112,7 +105,7 @@ STMC *copy_1(STMDEF *to,STMC *s,short f,short l,STMACC acc)
 		return nil;
 	}
 	m_alerted=false;
-	if (acc < 0 and f eq 0 and l eq s->xl and (s->xfg&ISMAP))
+	if (acc < 0 and f eq 0 and l eq s->x_l and (s->xfg&ISMAP))
 	{						/* if, for instance, for undo buf */
 		sb->xtx=s->xtx;
 		sb->xrm=s->xrm;
@@ -126,7 +119,7 @@ STMC *copy_1(STMDEF *to,STMC *s,short f,short l,STMACC acc)
 		sb->xfg=0;
 		sb->xrm=0;
 	}
-	sb->xl=l;
+	sb->x_l=l;
 	sb->xun=0;
 	return sb;
 }
@@ -167,6 +160,17 @@ short analtabs(short t[],char *tx)
 	return ot;
 }
 
+global
+void clear_undo(IT *w)
+{
+	if (w->old)
+	{
+		clearmal(w->old);
+		stmclear(w->old);
+	}
+	w->undone=false;
+}
+
 static
 WINIT buf_winit
 {
@@ -191,9 +195,9 @@ char *bufname(void)
 }
 
 static
-FCLOSE delete_buf
+FCLOSE buf_delete
 {
-	if (cfg.a)
+	if (cfg.a and !cfg.s)
 		write_out(w, buffn.s);
 	clearmal(w->base);
 	stmclear(w->base);
@@ -201,6 +205,15 @@ FCLOSE delete_buf
 	close_w(w);
 	stmdelcur(&winbase);
 	return true;
+}
+
+global
+VpV end_buf		/* 07'20 HR: v6 */
+{
+	IT *w = get_it(-1, BUFF);
+	
+	if (w)
+		buf_delete(w, true);
 }
 
 static
@@ -224,8 +237,7 @@ void invoke_editor(OBJECT *m)
 		IT *w;
 		STMC *eerste;
 
-		if	( (w=editor_window(
-					false,
+		if	( (w=editor_window(false,
 					" Copy/paste buffer ",
 					" ",
 					KIND,
@@ -237,7 +249,7 @@ void invoke_editor(OBJECT *m)
 					&tmen,
 					ed_key,
 					close_buf,
-					delete_buf,
+					buf_delete,
 					text_full,
 					txt_timer,
 					buf_winit
@@ -262,7 +274,7 @@ void invoke_editor(OBJECT *m)
 		{
 			eerste=stminsert(&shunt,FIRST);
 			eerste->xtx=shuntmap;
-			eerste->xl=0;
+			eerste->x_l=0;
 			eerste->xrm=0;
 			eerste->xfg=ISMAP;
 		}
@@ -313,12 +325,6 @@ void do_ficha(IT *w)
 }
 
 static
-void disforbuffer(OBJECT *m)
-{
-	dis_paste_etc(m,false);
-}
-
-static
 bool is_changed(IT *w,bool *modified)
 {
 	STMDEF *m;
@@ -352,10 +358,10 @@ bool is_changed(IT *w,bool *modified)
 		s = stmfifirst(m);
 		while (s)
 		{
-			if ( strncmp(b, s->xtx, s->xl) ne 0)
+			if ( strncmp(b, s->xtx, s->x_l) ne 0)
 				return true;
 
-			b += s->xl;
+			b += s->x_l;
 
 			if (*b)
 				return true;
@@ -384,7 +390,7 @@ bool check_modified(char *fn)
 }
 
 #ifdef MNUNDO
-static
+global
 void to_undo(IT *w,STMC *s)
 {
 	STMDEF *m;
@@ -419,7 +425,7 @@ void to_undo(IT *w,STMC *s)
 		}
 
 		if (acc > 0)
-			if ( (cur = copy_1(m,s,0,s->xl,-acc)) ne nil)	/* -acc do not force alloc of s->xtx */
+			if ( (cur = copy_1(m,s,0,s->x_l,-acc)) ne nil)	/* -acc do not force alloc of s->xtx */
 			{									/* !!!! 9'97 !!!! afgeschaft; Gaat helemaal fout bij collect etcetera. */
 				cur->xn=s->xn;
 				cur->xun=s->xun;
@@ -434,17 +440,6 @@ void to_undo(IT *w,STMC *s)
 				stmfinext(m);
 			}
 	}
-}
-
-global
-void clear_undo(IT *w)
-{
-	if (w->old)
-	{
-		clearmal(w->old);
-		stmclear(w->old);
-	}
-	w->undone=false;
 }
 
 global
@@ -544,7 +539,7 @@ void un_nl(IT *w, bool un_flag)
 
 	while (s)
 	{
-		char *u=s->xtx+s->xl;
+		char *u=s->xtx+s->x_l;
 		if (un_flag)
 			s->xfg&=~(ISMOD|IN_UNDO);
 		if (s->xfg&ISMAP)			/* also if NOT collected */
@@ -616,7 +611,7 @@ bool collect(IT *w)			/* new length in w->mapl, newmap in w->map */
 
 			s->xtx =new_user;
 			s->xfg |= ISMAP;			/* retain modified status until unflag() */
-			s->xl  = ln;				/* converge to consistancy */
+			s->x_l  = ln;				/* converge to consistancy */
 			s->xrm = 0;
 			s = stmfinext(m);
 		}
@@ -714,7 +709,7 @@ void savefile(IT *w,char *fn,bool force)
 				return;
 			}
 			/* There was no room to collect the chain into a single string */
-			if (write_out(w,fn))
+			if (write_out(w, fn))
 				un_nl(w, true);		/* + un_flag */
 			else
 				un_nl(w, false);
@@ -813,20 +808,20 @@ bool copy_txt(STMC *s,short l)		/* does not change the text */
 	if (!(s->xfg&ISMAP))
 		free(s->xtx);
 	s->xtx=c;
-	s->xrm=l-s->xl;
+	s->xrm=l-s->x_l;
 	s->xfg&=~ISMAP;
 	return true;
 }
 
-static
+global
 bool split(IT *w,STMC *s,short f,short avrg)		/* s must be current */
 {
-/*	allways move to undo, also when f=0 or f=s->xl,
+/*	allways move to undo, also when f=0 or f=s->x_l,
  *	(only empty new line inserted, original line unchanged)
  *	because this line acts as indicater AND synchronizer for undo operation
  */
 	char *c,*d;
-	short a= s->xl - f;
+	short a= s->x_l - f;
 	STMDEF *m=w->base;
 	STMC *new;
 
@@ -843,15 +838,15 @@ bool split(IT *w,STMC *s,short f,short avrg)		/* s must be current */
 	strcpy(c,d);						/* copy right part */
 
 	if (s->xfg&ISMAP)
-		if ( !copy_txt(s,s->xl) )		/* new 1st line for left part */
+		if ( !copy_txt(s,s->x_l) )		/* new 1st line for left part */
 			return stmdelcur(m),false;
 		else
 			*(s->xtx+f)=0;
 	else
 		*d=0;
 
-	new->xl  = a;
-	s->xl   -= a;
+	new->x_l  = a;
+	s->x_l   -= a;
 	s->xrm += a;
 	s->xfg|=ISMOD;
 
@@ -875,14 +870,14 @@ short check_l(short l, short avrg)	/* tries to get as many in a line as possible
 	return l;
 }
 
-static
+global
 bool catenate(IT *w,STMDEF *m,STMC *s,short avrg)		/* s must be current */
 {
 	short l;
 	char *c;
 	STMC *nx;
 
-	if (!s->xl)	/* this line empty; just delete (but mark nx as modified) */
+	if (!s->x_l)	/* this line empty; just delete (but mark nx as modified) */
 	{
 		to_undo(w,s);
 		deletecur(m,s);
@@ -902,7 +897,7 @@ bool catenate(IT *w,STMDEF *m,STMC *s,short avrg)		/* s must be current */
 		return false;
 	}
 
-	if (!nx->xl)	/* next line empty; just delete (but mark s as modified) */
+	if (!nx->x_l)	/* next line empty; just delete (but mark s as modified) */
 	{
 		to_undo(w,nx);
 		deletecur(m,nx);
@@ -913,9 +908,9 @@ bool catenate(IT *w,STMDEF *m,STMC *s,short avrg)		/* s must be current */
 							/* now nx and s are non empty */
 	to_undo(w,s);
 	to_undo(w,nx);
-	if (s->xrm < nx->xl)		/* in the MAP s->xrm is allways zero */
+	if (s->xrm < nx->x_l)		/* in the MAP s->xrm is allways zero */
 	{
-		if ( (l=check_l(s->xl + nx->xl,avrg)) < 0)	/* adds avrg if possible */
+		if ( (l=check_l(s->x_l + nx->x_l,avrg)) < 0)	/* adds avrg if possible */
 			return false;
 							/* old line into new */
 		if ( (c=mmalloc(l+1,"while catenating lines",ign,AH_CREATE_LINE)) <= 0 )
@@ -926,12 +921,12 @@ bool catenate(IT *w,STMDEF *m,STMC *s,short avrg)		/* s must be current */
 			free(s->xtx);
 		s->xtx = c;
 		s->xfg&=~ISMAP;
-		s->xl += nx->xl;
-		s->xrm = l - s->xl;
+		s->x_l += nx->x_l;
+		s->xrm = l - s->x_l;
 	othw
 		c = s->xtx;
-		s->xl   += nx->xl;
-		s->xrm -= nx->xl;
+		s->x_l   += nx->x_l;
+		s->xrm -= nx->x_l;
 	}
 	strcat(c,nx->xtx);					/* append next line */
 
@@ -940,7 +935,7 @@ bool catenate(IT *w,STMDEF *m,STMC *s,short avrg)		/* s must be current */
 	return true;
 }
 
-static
+global
 bool del_ch(IT *w,STMC *s,short f,short i)
 {
 	char *c,*d;
@@ -949,12 +944,12 @@ bool del_ch(IT *w,STMC *s,short f,short i)
 	{
 		to_undo(w,s);
 		if (s->xfg&ISMAP)
-			if ( !copy_txt(s,s->xl) )
+			if ( !copy_txt(s,s->x_l) )
 				return false;
 		d=s->xtx+f;
 		c=d+i;
 		while ( (*d++ = *c++) ne 0);	/* incl NL */
-		s->xl-=i;
+		s->x_l-=i;
 		s->xrm+=i;
 		s->xfg|=ISMOD;
 	}
@@ -993,8 +988,8 @@ bool delete_front(IT *w)
 	return ok;
 }
 
-static
-short del(IT *w, CINF ds, CINF de)
+global
+short _del_(IT *w, CINF ds, CINF de)
 {
 	STMDEF *m = w->base;
 	STMC   *s = find_line(w,ds.pos.y);
@@ -1007,7 +1002,7 @@ short del(IT *w, CINF ds, CINF de)
 		return 1;
 	othw
 		short i=ds.pos.y;
-		if ( !del_ch(w,s,ds.pos.x,s->xl-ds.pos.x) )
+		if ( !del_ch(w,s,ds.pos.x,s->x_l-ds.pos.x) )
 			return 0;
 		i++;
 		if ( (s=stmfinext(m)) ne 0L)
@@ -1031,7 +1026,7 @@ short del(IT *w, CINF ds, CINF de)
 	return 2;
 }
 
-static
+global
 bool delete(IT *w)
 {
 	bool sel = w->selection;
@@ -1069,7 +1064,7 @@ bool delete(IT *w)
 			}
 		}
 	othw		/* delete selection */
-		short dr = del(w, ds, de);
+		short dr = _del_(w, ds, de);
 		if (dr eq 1)					/* only within a single line */
 			(*w->disp)(w,s,HIDE);		/* + hidem; */
 		elif (dr eq 2)
@@ -1082,7 +1077,7 @@ bool delete(IT *w)
 	return true;
 }
 
-static
+global
 bool insert(IT *w,STMC *s,short f,short i,short code,short avrg)
 {
 	short l;
@@ -1091,21 +1086,21 @@ bool insert(IT *w,STMC *s,short f,short i,short code,short avrg)
 		set_X(w);
 		to_undo(w,s);
 		if (i > s->xrm)		/* no space in line (in ISMAP is never space) */
-			if ( (l=check_l(s->xl+i,avrg)) < 0)	/* adds avrg if possible */
+			if ( (l=check_l(s->x_l+i,avrg)) < 0)	/* adds avrg if possible */
 				return false;
 			else
 				if ( copy_txt(s,l) eq 0L)	/* alloc new larger line */
 					return false;
 		if (code&0xff)
 		{
-			short j  =s->xl-f+i;		/* move incl NL */
-			char *c=s->xtx+s->xl;
+			short j  =s->x_l-f+i;		/* move incl NL */
+			char *c=s->xtx+s->x_l;
 			char *d=c+i;
 			while(j--)
 				*d--=*c--;
 			*(s->xtx+f)=code&0xff;
 			s->xrm-=i;
-			s->xl+=i;
+			s->x_l+=i;
 			s->xfg|=ISMOD;
 		}
 		else
@@ -1115,7 +1110,6 @@ bool insert(IT *w,STMC *s,short f,short i,short code,short avrg)
 }
 
 #define T (unsigned char)
-
 
 global
 EDIT ed_key			/* 	IT *w,short kcode) */	/*	called from cursor.c */
@@ -1128,8 +1122,8 @@ EDIT ed_key			/* 	IT *w,short kcode) */	/*	called from cursor.c */
 	if (kcode < 0 and k eq NK_ESC)
 	{
 		cur_on(w);
-		kcode = exotic(v_hl,&wwa);	/* exotic() has his own inline rsc */
-		if (kcode < 0)				/* Cancelled */
+		kcode = exotic(w->vhl,&wwa);	/* exotic() has his own inline rsc */
+		if (kcode < 0)						/* Cancelled */
 			return false;
 		cur_off(w);
 	}
@@ -1158,8 +1152,7 @@ EDIT ed_key			/* 	IT *w,short kcode) */	/*	called from cursor.c */
 
 	if (kcode < 0 and (k eq NK_DEL or k eq 0x7f) )	/* 04'16 HR 0x7f for Aranym ? */
 	{
-/*		alert_text("kcode = %04x | k = %04x | NK_DEL = %04x", kcode, k, NK_DEL);
-*/		if ((kcode&NKF_CTRL) and !sel)
+		if ((kcode&NKF_CTRL) and !sel)
 		{
 			if (kcode&NKF_SHIFT)
 				delete_front(w);
@@ -1374,9 +1367,9 @@ bool re_tab(IT *w, STMC *s)
 
 	de_tab(tabbed,d,w->loc.tabp,' ',' ',MAXL+1);
 	l = tabulate(exp, tabbed, w->loc.tabn, MAXL+1, w->loc.tabl);
-	if (strcmp(exp,d) ne 0)
+	if (SCMP(1,exp,d) ne 0)
 	{
-		short sl = s->xl+s->xrm;
+		short sl = s->x_l+s->xrm;
 		to_undo(w,s);
 		if ((s->xfg&ISMAP) or sl < l )
 		{
@@ -1392,7 +1385,7 @@ bool re_tab(IT *w, STMC *s)
 			strcpy(s->xtx,exp);
 			s->xrm = sl - l;
 		}
-		s->xl=l;
+		s->x_l=l;
 	}
 	return true;
 }
@@ -1458,237 +1451,6 @@ void insert_fkey(IT *w, short i)
 #endif
 
 static
-bool copy(IT *w, bool shift, CINF ds, CINF de)
-{
-	STMC *s,*bs;
-	STMDEF *m=w->base, *bb=&shunt;
-
-	if (!shift)
-	{
-		IT *bw = get_it(-1,BUFF);
-		clearmal(bb);
-		stmclear(bb);
-		if (bw->map)
-		{
-			ffree(bw->map);
-			bw->map = nil;
-			bw->mapl = 0;
-		}
-	}
-
-	s=find_line(w,ds.pos.y);
-
-	if (ds.pos.y eq de.pos.y and *(s->xtx+ds.pos.x) )
-	{
-		if (!copy_1(bb,s,ds.pos.x,de.pos.x-ds.pos.x,LAST))
-			return false;
-		if (shift)
-		{
-			bs=stmfiprior(bb);
-			catenate(0L,bb,bs,w->avrg);
-		}
-	othw
-		short j=ds.pos.y;
-		bool rb=true;
-		if (copy_1(bb,s,ds.pos.x,s->xl-ds.pos.x,LAST))
-		{
-			if (shift)
-			{
-				bs=stmfiprior(bb);
-				catenate(0L,bb,bs,w->avrg);
-			}
-			j++;
-			if ( (s=stmfinext(m)) ne 0L)
-			{
-				while (s and j < de.pos.y)
-				{
-					rb=copy_1(bb,s,0,s->xl,LAST) ne nil;
-					if (!rb)
-						break;
-					s=stmfinext(m);
-					j++;
-				}
-				if ( s and rb )
-					copy_1(bb,s,0,de.pos.x,LAST);
-			}
-		}
-	}
-	update_it(shift, BUFF);
-	return true;
-}
-
-global
-bool cut(IT *w, bool shift, CINF ds, CINF de)
-{
-	STMC *s,*bs;
-	STMDEF *m=w->base,*bb=&shunt;
-
-	if (!shift)
-	{
-		clearmal(bb);
-		stmclear(bb);
-	}
-
-	s=find_line(w,ds.pos.y);
-
-	if (ds.pos.y eq de.pos.y and *(s->xtx+ds.pos.x) )
-	{
-		if (!copy_1(bb,s,ds.pos.x,de.pos.x-ds.pos.x,LAST))
-			return false;
-		if (shift)
-		{
-			bs=stmfiprior(bb);
-			catenate(0L,bb,bs,w->avrg);
-		}
-		del(w, ds, de);
-	othw
-		short j=ds.pos.y;
-		bool rb=true;
-		set_X(w);
-		if (copy_1(bb,s,ds.pos.x,s->xl-ds.pos.x,LAST))
-		{
-			if (shift)
-			{
-				bs=stmfiprior(bb);
-				catenate(0L,bb,bs,w->avrg);
-			}
-			if ( (rb=del_ch(w,s,ds.pos.x,s->xl-ds.pos.x)) ne 0)
-			{
-				j++;
-				if ( (s=stmfinext(m)) ne 0L)
-				{
-					while (s and j < de.pos.y)
-					{
-						to_undo(w,s);
-						stmmove(bb,m,LAST);	/* saves many mallocs */
-						s=stmfinext(m);
-						if (!s)
-						{
-							rb=false;
-							break;
-						}
-						j++;
-					}
-					if ( s and rb )
-						if ( copy_1(bb,s,0,de.pos.x,LAST) )
-							if ( del_ch(w,s,0,de.pos.x) )
-								if ( (s=stmfiprior(m)) ne 0L)
-									catenate(w,w->base,s,w->avrg);
-				}
-			}
-		}
-	}
-	update_it(shift, BUFF);
-	renum(w);
-	return true;
-}
-
-static
-bool buf_emp(CINF *s, CINF *e)
-{
-	IT *wb;
-	CINF ds,de;
-
-	wb = get_it(-1,BUFF);
-
-	if (wb->selection)
-	{
-		ds = wb->ss;
-		de = wb->se;
-	othw
-		ds = c1st;
-		t_to_s_x(wb, wb->view.sz.h - 1, MAXL, &de, HIGH);	/* de --> end of file */
-	}
-
-	if (s) *s = ds;
-	if (e) *e = de;
-
-	if (ds.pos.y eq de.pos.y and ds.pos.x eq de.pos.x and ds.pos.x eq 0)
-		return true;			/* buffer empty */
-
-	return false;
-}
-
-static
-bool paste(IT *w, CINF *cu)
-{
-	IT *wb;
-	STMC *s,*bs;
-	CINF ds,de;
-	STMDEF *m=w->base,*bb=&shunt;
-
-	wb=get_it(-1,BUFF);
-
-	if (buf_emp(&ds, &de)) return false;
-
-	bs=find_line(wb,ds.pos.y);
-	s =find_line(w,cu->pos.y);
-
-	if (ds.pos.y eq de.pos.y and *(bs->xtx+ds.pos.x))
-	{
-		short l=de.pos.x-ds.pos.x;
-		if (insert(w,s,cu->pos.x,l,'?',w->avrg))	/* may change s->xtx */
-		{
-			char *sn=s->xtx+cu->pos.x;
-			char *bn=bs->xtx+ds.pos.x;
-			cu->pos.x+=l;
-			while (l--) *sn++=*bn++;
-			x_to_s_t(w,cu);
-			(*w->disp)(w,s,HIDE);
-		}
-	othw
-		short j=ds.pos.y;
-		bool rb=true;
-		short l=bs->xl-ds.pos.x;
-
-		if (split(w,s,cu->pos.x,l))
-		{
-			s=stmfiprior(m);
-			if (insert(w,s,cu->pos.x,l,'?',w->avrg))
-			{
-				char *sn=s->xtx+cu->pos.x;
-				char *bn=bs->xtx+ds.pos.x;
-				while (l--) *sn++=*bn++;
-				if ( (bs=stmfinext(bb)) ne 0L)
-				{
-					j++;
-					while (bs and j < de.pos.y)
-					{
-						rb=copy_1(m,bs,0,bs->xl,NEXT) ne nil;
-						if (!rb)
-							break;
-						bs=stmfinext(bb);
-						j++;
-					}
-					s =stmfinext(m);	/* the one splitted off */
-
-#if INTERNAL
-					if (!s)
-						form_alert(1,"[3][|Internal error !|lost split][ Stop ]");
-					else
-#endif
-					if ( bs and rb)
-					{
-						l=de.pos.x;
-						if (insert(w,s,0,l,'?',w->avrg))
-						{
-							char *sn=s->xtx;
-							char *bn=bs->xtx;
-							cu->pos.x=l;
-							while (l--) *sn++=*bn++;
-						}
-					}
-				}
-			}
-		}
-	}
-	renum(w);
-	cu->pos.y+=de.pos.y-ds.pos.y;
-	x_to_s_t(w,cu);
-	return true;
-}
-
-static
 void change_case(IT *w, char *(*to_case)(char *s))
 {
 #if 0			/* Not shure if this is something I want */
@@ -1722,13 +1484,13 @@ void change_case(IT *w, char *(*to_case)(char *s))
 			e -= 1;
 		while (s->xn <= e)
 		{
-			if (s->xl ne 0)
+			if (s->x_l ne 0)
 			{
 				set_X(w);
 				to_undo(w,s);
-				if (copy_txt(s, s->xl))
+				if (copy_txt(s, s->x_l))
 				{
-					char c, *cs = s->xtx + ((s->xn eq e) ? fe : s->xl);
+					char c, *cs = s->xtx + ((s->xn eq e) ? fe : s->x_l);
 					c = *cs;
 					*cs = 0;
 					(*to_case)(s->xtx + fs);
@@ -1747,133 +1509,7 @@ void change_case(IT *w, char *(*to_case)(char *s))
 	}
 }
 
-static
-void mnpaste(IT *w)
-{
-	if (!buf_emp(nil, nil))
-	{
-		if (w->selection)
-			delete(w);
-
-		make_vis_cur(w);
-		paste(w, &w->cu);
-		cur_off(w);
-		if (!make_vis_cur(w))
-		{
-			via (w->slider)(w);
-			do_redraw(w,w->wa);
-		}
-		cur_on(w);
-	}
-}
-
-global
-void do_Buffer(IT *w,short mt,short kstate)
-{
-#if defined(MNCUTAP) || defined(MNCOPYAP)
-	bool shift = mt eq MNCUTAP or mt eq MNCOPYAP;
-#else
-	bool shift = false;
-#endif
-
-	if (w)
-		switch (mt)
-		{
-		#ifdef MNCOPYAP
-			case MNCOPYAP:
-		#endif
-		#ifdef MNCOPY
-			case MNCOPY:
-			if (w->selection)
-			{
-				if (copy(w, shift, w->ss, w->se))
-					make_visible(w,w->ss, true);
-			othw
-				CINF ss,se;
-				set_line(w,&ss,&se);
-				if (copy(w, shift, ss, se))
-					make_vis_cur(w);
-			}
-			break;
-		#endif
-		#ifdef MNCUTAP
-			case MNCUTAP:
-		#endif
-		#ifdef MNCUT
-			case MNCUT:
-			if (w->selection)
-			{
-				make_visible(w,w->ss, true);
-				if (cut(w, shift, w->ss, w->se))
-				{
-					w->cu=w->ss;
-					w->ss=cnil;
-					w->se=cnil;
-					cur_off(w);
-					via (w->slider)(w);
-					do_redraw(w,w->wa);
-					cur_on(w);
-				}
-			othw
-				CINF ss,se;
-				make_vis_cur(w);
-				cur_off(w);
-				set_line(w,&ss,&se);
-				if (cut(w, shift, ss, se))
-				{
-					w->cu=ss;
-					via (w->slider)(w);
-					do_redraw(w,w->wa);
-				}
-				cur_on(w);
-			}
-			break;
-		#endif
-		#ifdef MNPASTE
-			case MNPASTE:
-				mnpaste(w);
-			break;
-		#endif
-		}
-}
-
-global
-void repLbyR(IT *w)
-{
-	STMC *ws;
-	IT *wt=w,*w2=nil;
-
-	while ((ws=stmfind(&winbase,NEXT,CYCLIC)) ne nil)
-	{
-		w2=ws->wit;
-		if (is_srce(w2))
-			break;
-	}
-
-
-	if (w2 and w2 ne w)
-	{
-		if (wt->selection)
-		{
-			if (w2->selection)
-			{
-				if (copy  (wt, false, wt->ss, wt->se))
-				{
-					mnpaste(w2);
-					txtsel_cursor(w2,NK_RIGHT|NKF_FUNC);
-					txtsel_cursor(wt,NK_RIGHT|NKF_FUNC);
-					wt = get_it(wt->wh, -1);
-					wind_set(wt->wh,WF_TOP);
-					to_top();
-				}
-			}
-			else
-				send_msg("needs selection in other text window\n");
-		}
-		else
-			send_msg("needs selection in top (text)window\n");
-	}
-}
+#ifdef MNENUM			/* experimentation */
 
 static
 char *def(char *s)
@@ -1884,7 +1520,7 @@ char *def(char *s)
 	if (sk() eq '#')
 	{
 		skc(), str(rstr);
-		if (strcmp(rstr, "define") eq 0)
+		if (SCMP(2,rstr, "define") eq 0)
 		{
 			sk(), str(rstr);
 			sk();
@@ -1894,7 +1530,6 @@ char *def(char *s)
 	return nil;
 }
 
-#ifdef MNENUM			/* experimentation */
 static
 void make_typed_enum(STMDEF *d)
 {
@@ -2161,7 +1796,7 @@ void do_Edit(IT *w,short mt,short kstate)
 					e -= 1;
 				while (s->xn <= e)
 				{
-					if (s->xl ne 0)
+					if (s->x_l ne 0)
 						if (!insert(w, s, f, 1, '\t', SHOVERFL))
 							break;
 					f=0;
@@ -2260,380 +1895,4 @@ void do_Edit(IT *w,short mt,short kstate)
 		}
 }
 
-#if DRAGSELECTION
 
-static
-bool still_down(short b)
-{
-	short dum,button;
-	graf_mkstate(&dum,&dum,&button,&dum);
-	return button eq b;
-}
-
-static
-bool in_selection(IT *w, short mx, short my)
-{
-	long bx, by;
-
-	xy_to_unit(w, mx, my, &bx, &by);
-
-	if (by <  w->ss.pos.y or  by >  w->se.pos.y)
-		return false;
-	if (by eq w->ss.pos.y and bx <  w->ss.scrx)
-		return false;
-	if (by eq w->se.pos.y and bx >= w->se.scrx)
-		return false;
-	return true;
-}
-
-typedef struct {short x,y; } pair;
-static
-pair pxy[16];
-short nxy;
-
-static
-void write_poly(short hl, pair *pxy, short nxy)
-{
-	gsclip(hl,ON,scr_grect);	/* whole screen */
-	vsl_udsty(hl,0x5555);
-	vsl_color(hl,1);
-	vswr_mode(hl,3);
-	hidem;
-	v_pline(hl,nxy,(short *)pxy);
-	showm;
-	vswr_mode(hl,1);
-	vsl_type(hl,1);
-}
-
-static
-short add_pair(pair *p, short x, short y, short i)
-{
-	if (i)
-	{
-		short j = i - 1;
-		if (p[j].x eq x and p[j].y eq y)
-			return i;
-		if (j)
-		{
-			short k = j - 1;;
-			if (p[k].x eq x)
-			{
-				p[j].y = y;
-				return i;
-			}
-			if (p[k].y eq y)
-			{
-				p[j].x = x;
-				return i;
-			}
-		}
-	}
-
-	p[i].x = x;
-	p[i].y = y;
-	return i + 1;
-}
-
-static
-short make_poly(IT *w, pair *p)
-/* called when mouse points in selection */
-{
-	long sl, el;
-	short i, nl, sc, ec,
-		  ww = w->norm.sz.w,
-		  hw = w->norm.sz.h;
-	pair p0, p1, p2;
-	CINF ss = w->ss,
-		 se = w->se;
-	short top = w->norm.pos.y,
-		  bot = w->norm.pos.y + ww,
-		  xplusw = w->ma.x + w->ma.w;
-
-	if (C_cmp(&ss, &se) >= 0)
-		return 0;
-
-	sl=ss.pos.y;
-	sc=ss.scrx;
-	el=se.pos.y;
-	ec=se.scrx;
-
-	sc -= w->norm.pos.x;
-	ec -= w->norm.pos.x;
-
-	if (sc <  0 )     sc = 0;
-	if (sc >  ww - 1) sc = 0,  sl++;
-	if (ec <= 0 )     ec = ww, el--;
-	if (ec >  ww - 1) ec = ww;
-
-	if (sl < top  ) sl = top, sc=0;
-	if (el > bot-1) el = bot-1,ec=ww;
-
-	sl -= w->norm.pos.y;
-	el -= w->norm.pos.y;
-
-	if (sl < 0   ) sl=0,   sc=0;
-	if (el > hw-1) el=hw-1,ec=ww;
-
-	p0.x = w->ma.x;
-	p0.y = w->ma.y;
-	p1.x = p0.x+(sc*w->unit.w);
-	p1.y = p0.y+(sl*w->unit.h);
-	p2.x = p0.x+(ec*w->unit.w);
-	p2.y = p0.y+(el*w->unit.h)+w->unit.h;
-
-/*                              0                         1
-		8                      	___________________________
-		______________________9_|_________________________| 2
-		|_________________________________________________| 3
-	 7  |_______________| 4
-	   6                5
-
-	add_pair() doesnt add when x and y are same as previous.
-	More over: if a line doesnt change direction, the previous
-	pair is adapted.
-*/
-	nl = el - sl;
-	i = add_pair(p, p1.x, p1.y, 0);						/* 0 */
-	if (nl)
-	{
-		i = add_pair(p, xplusw, p1.y, i);				/* 1 */
-		i = add_pair(p, xplusw, p1.y + w->unit.h, i);	/* 2 */
-	        p1.y += nl * w->unit.h;
-		i = add_pair(p, xplusw, p1.y, i);				/* 3 */
-	}
-	i = add_pair(p, p2.x  , p1.y, i);					/* 4 */
-	i = add_pair(p, p2.x  , p2.y, i);					/* 5 */
-	if (nl)
-	{
-		i = add_pair(p, p0.x  , p2.y, i);				/* 6 */
-		i = add_pair(p, p0.x  , p1.y, i);				/* 7 */
-	        p1.y -= nl * w->unit.h;
-		i = add_pair(p, p0.x  , p1.y + w->unit.h, i);	/* 8 */
-	}
-	i = add_pair(p, p1.x  , p1.y + w->unit.h, i);		/* 9 */
-	i = add_pair(p, p1.x  , p1.y, i);					/* close */
-
-	return i;
-}
-
-static
-/* Mouse Form Block */
-MFORM
-ARROW_4={7,7,1,0,1
-,0x03C0,0x07E0,0x0FF0,0x07E0
-,0x23C4,0x73CE,0xFFFF,0xFFFF
-,0xFFFF,0xFFFF,0x73CE,0x23C4
-,0x07E0,0x0FF0,0x07E0,0x03C0
-,0x0180,0x03C0,0x07E0,0x0180
-,0x0180,0x2184,0x6186,0xFFFF
-,0xFFFF,0x6186,0x2184,0x0180
-,0x0180,0x07E0,0x03C0,0x0180
-},
-FORBID={7,7,1,0,1
-,0x0FF0,0x3FFC,0x7FFE,0x7E7E
-,0xF83F,0xF07F,0xF0FF,0xE1E7
-,0xE3C7,0xE78F,0xFF0F,0xFE1F
-,0x7E7E,0x7FFE,0x3FFC,0x0FF0
-,0x0180,0x07E0,0x1C38,0x300C
-,0x201C,0x6036,0x4062,0xC0C3
-,0xC183,0x4302,0x6606,0x2C04
-,0x380C,0x1C38,0x07E0,0x0180
-};
-
-typedef enum {plus,arr4,forb} MF;
-
-static
-MF rat(MF was, MF nu)
-{
-	if (was ne nu)
-		switch(nu)
-		{case plus:	graf_mouse(6,nil); break;
-		 case arr4: graf_mouse(USER_DEF,&ARROW_4); break;
-		 case forb: graf_mouse(USER_DEF,&FORBID); break;
-		}
-	return nu;
-}
-
-global
-bool write_cur(IT *w, CINF cu);
-
-/* drag a selection */
-global
-DRAG_SEL drag_selection 		/* w,button,kstate,bclicks,mx,my */
-{
-	IT *wt = w; MF was = -1;
-	bool shift = (kstate&(LSHIFT|RSHIFT)) ne 0,
-		 cop   = shift;
-
-	if (	w->ty ne BUFF
-		and w->selection
-		and button eq 2
-		and still_down(button)
-		and in_selection(w,mx,my)
-	   )
-	{
-		short state;
-		static short obx,oby;
-
-		CINF s1=w->ss,s2=w->se,
-			 cu=s1;
-/*		long ps=s1.pos.y*(MAXL+1)+s1.pos.x,		/* for easy comparisons */
-		     pe=s2.pos.y*(MAXL+1)+s2.pos.x,
-		     pn;
-*/
-		short hl = w->hl;
-
-		nxy = make_poly(w,pxy);
-
-		write_cur(w,cu);
-		obx=(mx/w->unit.w)*w->unit.w;
-		oby=(my/w->unit.h)*w->unit.h;
-
-		write_poly(hl,pxy,nxy);
-
-		was = rat(was,cop?plus:arr4);
-
-		do					/* drag the polyline */
-		{
-			graf_mkstate(&mx,&my,&button,&state);
-			mx = (mx/w->unit.w)*w->unit.w;
-			my = (my/w->unit.h)*w->unit.h;
-			if (mx ne obx or my ne oby)
-			{
-				short i;
-				write_poly(hl,pxy,nxy);		/* unwrite old */
-				write_cur(w,cu);
-				for (i=0; i<nxy; i++)	/* update points */
-					pxy[i].x += mx-obx, pxy[i].y += my-oby;
-				if (m_inside(pxy[0].x,pxy[0].y,w->rem))
-				{
-					if (w eq wt)
-						cop = shift;
-					was = rat(was,cop?plus:arr4);
-				othw
-					short nh = wind_find(pxy[0].x,pxy[0].y);
-					was = rat(was,forb);
-					if (nh)
-					{
-						IT *nw = get_it(nh,-1);
-						if (nw)
-						{
-							if (    nw->ty ne BUFF
-								and is_text(nw)
-								and nw->edit        )
-							{
-								w_top(nh, nw, w);
-								do_redraw(nw, nw->wa);
-								w = nw;
-								cop = true;
-								was = rat(was,plus);
-							}
-						}
-					}
-				}
-				{
-					long bx, by;
-					xy_to_unit(w, pxy[0].x, pxy[0].y, &bx, &by);
-					t_to_s_x(w, by, bx, &cu, LOW);
-					write_cur(w,cu);
-					write_poly(hl,pxy,nxy);		/* write new */
-					obx = mx;
-					oby = my;
-				}
-			}
-		} while (button);
-
-		write_poly(hl,pxy,nxy);	/* unwrite last */
-		write_cur(w,cu);		/* insertion point */
-
-		if (m_inside(pxy[0].x,pxy[0].y,w->ma))
-		{
-			if (w eq wt)
-			{
-				if (	 w->edit
-				    and !((C_cmp(&s1, &cu) < 0) and C_cmp(&cu, &s2) < 0)
-				   )
-				{
-					w->deselect(w,LOW);
-
-					if (cop)
-					{
-						copy(w, false, s1, s2);		/* copy doesnt change new cur pos */
-						paste(w, &cu);
-					}
-					elif (C_cmp(&cu, &s1) <= 0)		/* move up doesnt change new cur pos */
-					{
-						cut(w, false, s1, s2);
-						paste(w, &cu);
-					othw							/* move down */
-						copy(w, false, s1, s2);		/* first copy, then insert, then delete */
-						paste(w, &cu);
-						del(w, s1, s2);
-						cu.pos.y -= s2.pos.y - s1.pos.y;
-					}
-					w->cu=cu;
-					w->norm.pos.y = bounce(w,w->norm.pos.y);
-					via (w->slider)(w);
-					do_redraw(w,w->wa);
-					cur_on(w);
-				}
-			othw		/* wt is now the window from which the drag is started!! */
-						/* w is the target window */
-				if (cop or wt->edit eq nil)
-					copy(wt, false, s1, s2);
-				else
-				{
-					wt->deselect(wt,LOW);
-					cut(wt, false, s1, s2);
-					wt->norm.pos.y = bounce(wt,wt->norm.pos.y);
-					via (wt->slider)(wt);
-					do_redraw(wt,wt->wa);
-				}
-
-				w->deselect(w,LOW);
-				paste(w, &cu);
-				w->cu=cu;
-				w->norm.pos.y = bounce(w,w->norm.pos.y);
-				via (w->slider)(w);
-				do_redraw(w,w->wa);
-				cur_on(w);
-			}
-		}
-		via(w->muisvorm)(w);
-		return true;
-	}
-	else
-		return false;
-}
-#endif
-
-global
-void open_buf(void)
-{
-	short buffer;
-	IT *w;
-
-	w = get_it(-1,BUFF);
-	buffer = w->wh;
-	if (stmfirst(*w->base) eq 0L)
-		form_alert(1,frstr(BEMP));
-	else
-	if ( buffer > 0 )
-	{
-		wind_set(buffer,WF_TOP);
-		to_top();
-	othw
-		if ( (buffer=wind_create(
-					w->wkind,win.x,win.y,win.w,win.h)
-			 ) < 0 )		/* NB max grootte */
-			alertwindow("het buffer");
-		else
-		{
-			w->wh=buffer;
-			w->norm.sz.w  = w->ma.w/wchar;
-			w->norm.pos.y = 0;
-			open_w(w);	/* put window on screen (includes get_work() & sliders()) */
-			disforbuffer(w->menu->m);
-		}
-	}
-}

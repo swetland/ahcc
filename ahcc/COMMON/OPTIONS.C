@@ -184,13 +184,6 @@ void do_Mode(IT *wt, short mt)
 		}
 		break;
 #endif
-#ifdef MNNKCC
-		case MNNKCC:
-			nkcc_opt = do_nkcc(v_hl,&wwa,nkcc_opt);
-			nkc_set(nkcc_opt);
-		break;
-#endif
-
 #ifdef MNWINDOW
 		case MNWINDOW:
 			kit_dial(wt,  0, MNWINDOW);

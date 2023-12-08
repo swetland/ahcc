@@ -97,14 +97,16 @@ DO_TOKEN do_nl
 	n_line_no = *(long *)ln;
 	G.tk_flags &= TK_KEEP;
 	/* only used for -D, retokenize(##) macros, assembler and preprocessor directives */
-#if BIP_ASM
+
 	if (G.tk_flags&TK_SEENL)
 	{
 		tok_NL();
+#if BIP_ASM
 		if (n->cat eq ws)				/* 10'10 HR: white space after newline: for labels */
 			curtok->nflgs.f.p1ws = 1;
-	}
 #endif
+	}
+
 	G.tk_flags |= TK_SAWNL;		/* 03'09 */
 	return n;
 }
@@ -343,7 +345,7 @@ DO_TOKEN do_dig		/* (LEX_RECORD *r, LEX_RECORD *n, XP tokcur); */
 			{
 #if LL
 				if (    is_1lo(r)
-				    or (r->rl - size_LEX -1 eq 12 and strcmp(r->text + 1, "37777777777") > 0)
+				    or (r->rl - size_LEX -1 eq 12 and SCMP(73,r->text + 1, "37777777777") > 0)
 				    or tokcur->zflgs.f.see_ll
 				   )
 				{
@@ -356,7 +358,7 @@ DO_TOKEN do_dig		/* (LEX_RECORD *r, LEX_RECORD *n, XP tokcur); */
 			othw
 #if LL
 				if (    is_1ld(r)
-				    or (r->rl - size_LEX  eq 10 and strcmp(r->text, "4294967295") > 0)
+				    or (r->rl - size_LEX  eq 10 and SCMP(74,r->text, "4294967295") > 0)
 				    or tokcur->zflgs.f.see_ll
 				   )
 				{

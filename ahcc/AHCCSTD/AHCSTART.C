@@ -44,12 +44,6 @@ long _PgmSize;
 VpV *_AtExitVec = nil, *_FilSysVec = nil;
 char **__EnvStrPtr = nil;
 
-enum
-{
-	MINSTK = 4096,
-	MARGIN = 512
-};
-
 #define BP BASEPAGE
 
 void __asm__ __text(void)
@@ -259,8 +253,14 @@ Exite:
 	move.l	d3, d0
 	move.l	a5, a0
 	move.l	a4, a1
+
+	move.l	 a1,-(a7)
+	move.l	 a0,-(a7)
+	move.w	 d0,-(a7)
+
 	jsr 	main
 
+	lea 	 10(a7),a7
 *
 * Terminate program
 *

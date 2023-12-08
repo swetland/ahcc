@@ -26,13 +26,14 @@
  *	There is also a variable y.
  *
  *	Values of both x and y must be passed to function F_x.
- *	Values <= 0 implement the defaults which are 10 for x and 2 for y (but see fu F_x below)ß.
+ *	Values <= 0 implement the defaults which are 10 for x and 2 for y (but see fu F_x below).
  */
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+
 #include "f_x.h"
 
 char * Pos;
@@ -43,6 +44,11 @@ Token BADTOK=BADSTR;
 double varx,	/* to be set by routines that perform f(x) = (formula on x) for many x's */
        vary;	/* to be set by routines that perform f(y) = (formula on y) for many y's */
 				/* or, of course, formulas that use both. */
+#if ! SHEET
+Token accumulator = {NUM, PRIMARY, "accumulator", 0};	/* to be set to every result of a formula evaluation. */
+#endif
+
+bool init;
 
 static
 bool is_end(char c)
@@ -78,8 +84,13 @@ Token parsenext(void)
 	return Cur;
 }
 
+#define global
 global
-void parsedef(PARSE_NEXT *token, Token (*tab)[])
+void parsedef
+(
+	PARSE_NEXT *token,
+	Token (*tab)[]
+)
 {
 	parsepar.tok=token ? token : parsenext;
 	parsepar.tab=tab ? tab : &parsetab;
@@ -95,16 +106,22 @@ Token parsetab[]=
 	{NUM,	PRIMARY,"r", 180/M_PI},
 	{VX,	PRIMARY,"x", 0},
 	{VY,	PRIMARY,"y", 0},
-#if SHEET
+#if ! SHEET
+	{VZ,	PRIMARY,"z", 0},
+#else
 	{LHELM,	PRIMARY,"lhelm"},
 	{FHELM,	PRIMARY,"fhelm"},
 #endif
 	{RABS,	PRIMARY,"|" },
 	{LPAR,	PRIMARY,"("	},
 	{ABS,	UNARY,"abs" },
-	{SQRT,	UNARY,"V"	},
+#if __APPLE__
+	{SQRT,	UNARY,"√"	},		/* real sqrt graph (on iMAC) */
+#endif
+	{SQRT,	UNARY,"V"	},		/* square root */
+	{CURT,	UNARY,"cV"  },		/* cubic  root */
 	{SQRT,	UNARY,"sqrt"},
-	{SQRT,	UNARY,"\xfb"},		/* real V graph */
+	{SQRT,	UNARY,"\xfb"},		/* another real sqrt graph (on Atari this is ALT + 251) */
 	{SQR,	UNARY,"sqr"	},
 	{SINH,	UNARY,"sinh"},
 	{COSH,	UNARY,"cosh"},
@@ -126,15 +143,15 @@ Token parsetab[]=
 	{TODEG,	UNARY,"tod"	},
 #if SHEET
 	{DEREF, UNARY,"<-"	},
-	{MAX,	BINARY+8,"max"},
+/* NB: BINARY itself shoud be odd */
+	{MAXIM,	BINARY+8, "max"},
+	{MINIM,	BINARY+8, "min"},
 	{ELSE,	BINARY+10,"!"},
 	{QUEST,	BINARY+12,"?"},
-#endif
 	{OR,	BINARY+14,"|"},
 	{OR,	BINARY+14,"or"},
 	{AND,	BINARY+16,"&"},
 	{AND,	BINARY+16,"and"},
-#if SHEET
 	{EQ,	BINARY+18,"="},
 	{NEQ,	BINARY+18,"<>"},
 	{LTEQ,	BINARY+20,"<="},
@@ -148,7 +165,13 @@ Token parsetab[]=
 	{DIV,	BINARY+26,"/"},
 	{POW,	BINARY+30,"^"},
 #if SHEET
-	{RANGE, BINARY+32,":"},
+  #if COUNT
+	{COUNT,	BINARY+32,"#"},		/* return number of values (also from formulas) (as used by AVRG) */
+  #endif
+  #if AVRG
+	{AVRG,	BINARY+34,":/"},	/* return average value of series of values (also from formulas) */
+  #endif
+	{RANGE, BINARY+36,":"},		/* return sum of series of values (also from formulas) */
 #endif
 	{RPAR,	PRIMARY-2,")"},		/* stoppers */
 	BADSTR						/* also table terminator */
@@ -224,6 +247,7 @@ char * get_hex(char *s, long *l)
 	*l = 0;
 	while (*s)
 	{
+
 		uchar c = tolower(*s);
 		if (c >= '0' and c <= '9')
 			j = j*16+(c-'0');
@@ -242,7 +266,8 @@ char *parselook(char *s)
 {
 	char *save=s;
 	char c = tolower(*s);
-	if ( c eq 'h')		/* N.B. x is the builtin variable. */
+
+	if ( c eq '$')
 	{
 		long l;
 		s++;
@@ -261,6 +286,7 @@ char *parselook(char *s)
 		Cur.name = save;
 	othw
 		Token *z=*parsepar.tab;
+
 		while (z->t ne BAD)		/* table lookup */
 		{
 			char *cz=z->name;
@@ -269,12 +295,13 @@ char *parselook(char *s)
 			{
 				if (*s eq 0  ) break;
 				if (*s ne *cz) break;
-				s++,cz++;
+				s++;
+				cz++;
 			}
 			if (*cz eq 0)		/* must have been equal */
 			{
 				Cur=*z;			/* make a copy */
-				if (Cur.t eq VX)
+				if   (Cur.t eq VX)
 				{
 					Cur.v = varx;
 					Cur.t = NUM;
@@ -284,6 +311,11 @@ char *parselook(char *s)
 					Cur.v = vary;
 					Cur.t = NUM;
 				}
+
+#if ! SHEET
+				elif (Cur.t eq VZ)
+					Cur = accumulator;
+#endif
 				break;
 			}
 			else
@@ -294,10 +326,11 @@ char *parselook(char *s)
 		if (z->t eq BAD)			/* token not found (the real BAD from the table */
 		{
 			s = save;
-/*			printf("BAD: got '%s'\n", s); */
+#if ! SHEET
+			printf("BAD: got '%x'(%c)\n", *s, *s);
+#endif
 			if (*s >= 'a' and *s <= 'z')
 			{
-
 				Cur.p = PRIMARY;
 				Cur.name = s;
 				while (*s >= 'a' and *s <= 'z')
@@ -318,23 +351,27 @@ char *parselook(char *s)
 				static char *e="'?': bad token";
 				*(e + 1) = *s++;
 #else
-				static char e[] = "'?': bad token";
+				static char e[] = "<?>: bad token";
 				e[1] = *s++;
 #endif
 				Cur = bad_tok(e);
 			}
 #if SHEET
 		othw
-	#if 0
-			if (    z->t eq RANGE
-			    and *s eq '%'
+			if (   z->t eq RANGE
+#if COUNT
+				or z->t eq COUNT
+#endif
+#if AVRG
+			    or z->t eq AVRG
+#endif
+#if MAXIM
+				or z->t eq MAXIM
+#endif
+#if MINIM
+				or z->t eq MINIM
+#endif
 			   )
-			{
-				s++;
-				s = get_int(s, &Cur.step);
-			}
-	#else
-			if (z->t eq RANGE)
 			{
 				save = s;
 				s = sk(s);
@@ -346,7 +383,6 @@ char *parselook(char *s)
 				else
 					s = save;
 			}
-	#endif
 #endif
 		}
 	}
@@ -369,6 +405,9 @@ Token parse_unop(Token o, Token r)
 		break;
 		case PLUS:
 			r.v=+r.v;
+		break;
+		case CURT:
+			r.v=pow(r.v, 1.000000/3.000000);
 		break;
 		case SQRT:
 			r.v=sqrt(r.v);
@@ -466,7 +505,7 @@ static Token * ftok(short i)
 #endif
 
 static
-Token Primary(void)
+Token Next(void)
 {
 	return parsepar.tok();		/* get next token. */
 }
@@ -498,14 +537,26 @@ Token parse_binop(Token o, Token l, Token r)
 		case POW:
 			lv=pow(lv,rv);
 		break;
+#if SHEET
 		case OR:
 			lv=lv or rv;
 		esac
 		case AND:
 			lv=lv and rv;
 		esac
-#if SHEET
 		case RANGE:
+#if COUNT
+		case COUNT:
+#endif
+#if AVRG
+		case AVRG:
+#endif
+#if MAXIM
+		case MAXIM:
+#endif
+#if MINIM
+		case MINIM:
+#endif
 			lv=shrange(o,l,r);
 		esac
 		case EQ:
@@ -563,20 +614,20 @@ Token Unary(void)
 
 	if (can_un(o.p))
 	{
-		Primary();
+		Next();
 		o.p=UNARY;
 		r=Unary();
 		r=parse_unop(o,r);
 	othw						/* is primary */
 		if (o.t eq LPAR)		/* left parenthesis */
 		{
-			r=Binary(Primary(),need_LEFT);		/* whole expression as primary */
+			r=Binary(Next(),need_LEFT);		/* whole expression as primary */
 			if (Cur.t ne RPAR and !is_bad(r))
 				r=bad_tok("missing ')'");
 		}
 		elif (o.t eq RABS)		/* right stroke */
 		{
-			r=Binary(Primary(),need_LEFT);		/* whole expression as primary */
+			r=Binary(Next(),need_LEFT);		/* whole expression as primary */
 			if (Cur.t ne RABS and !is_bad(r))
 				r=bad_tok("missing '|'");
 			elif (r.v < 0)
@@ -591,23 +642,38 @@ Token Unary(void)
 static
 Token Binary(Token l, bool has_left)
 {
-	Token o,r;							/* operator, right part */
+	Token o,r;						/* operator, right part */
 
 	if (!has_left)
-		l=Unary(), Primary();			/* for left part */
+	{
+#if ! SHEET
+		if (init and is_bin(Cur))
+		{
+			l = accumulator;
+			init = false;
+		}
+		else
+#endif
+		{
+			l = Unary();
+			Next();	/* for left part */
+		}
+	}
 
 	while (is_bin(Cur))
 	{
-		o=Cur, Primary();				/* for operator */
-		r=Unary(), Primary();			/* for right part */
+		o = Cur; 					/* for operator */
+		Next();
+		r = Unary();				/* for right part */
+		Next();
 
 		if (is_bin(Cur))
 		{
-			if (Cur.p > o.p)			/* next is higher */
+			if (Cur.p > o.p)		/* next is higher */
 				r = Binary(r,has_LEFT);
 			else
-			if (Cur.p < o.p)			/* next is lower:  */
-				if (has_left)			/* if not at root level */
+			if (Cur.p < o.p)		/* next is lower:  */
+				if (has_left)		/* if not at root level */
 					return parse_binop(o,l,r);		/* leave recursion */
 		}
 		l = parse_binop(o,l,r);	/* equal priority; evaluate left to right (iterative) */
@@ -619,10 +685,17 @@ Token Binary(Token l, bool has_left)
 global
 Token F_x(double x, double y, char *s)
 {
+	Token val;
 	if (!parsepar.tok)
 		parsedef(nil, nil);
-	varx = x > 0 ? x : 10;
-	vary = y > 0 ? y :  2;
+	varx = x ne 0 ? x : 10;
+	vary = y ne 0 ? y :  2;
 	Pos = s;
-	return Binary(Primary(), need_LEFT);
+	init = true;
+	val = Binary(Next(), need_LEFT);
+#if ! SHEET
+	if (val.t eq NUM)
+		accumulator.v = val.v;
+#endif
+	return val;
 }

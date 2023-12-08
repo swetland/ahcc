@@ -37,8 +37,8 @@ typedef struct
 	     dsk,		/* desk rectangle */
 	     b,			/* rectangle for whole bar */
 	     t;			/* rectangle for titles */
-	short hl,			/* VDI handle */
-		wh;			/* window handle */
+	short vhl,		/* VDI handle */
+		  wh;		/* window handle */
 	OBJECT *m;		/* menu tree */
 	void *d;		/* dump area for pull_down */
 } M_S;				/* Menu Status */
@@ -56,14 +56,11 @@ typedef struct		/* pass shortcut by value */
 typedef
 short 	MENU_KS			(M_S *ms,M_KEY key,short *nmt);
 
-bool	m_inside		(short x,short y,RECT o);
-bool	is_outside		(RECT o,RECT i);
-bool	is_inside		(RECT i,RECT o);
 short 	change_ob		(OBJECT *ob,short item,RECT cl,bool sta);
 RECT	ob_rect			(OBJECT *ob,short item);
 bool 	menu_avail		(M_S *ms, short i);
 void 	menu_dis		(OBJECT *m, short item, bool dis);
-void	menu_init		(M_S *ms, short item, short hl, RECT desk);
+void	menu_init		(M_S *ms, short item);
 short 	menu_evm		(M_S *ms, short evmask, short event);
 short 	menu_title		(M_S *ms, bool state);
 void	menu_place		(M_S *ms, RECT men);
@@ -78,7 +75,5 @@ MENU_KS menu_keys;
 M_KEY	m_key			(short kcode);
 
 DRAWM	menu_draw;
-
-
 
 #endif

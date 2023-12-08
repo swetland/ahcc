@@ -34,7 +34,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "common/hierarch.h"
 #include "common/pdb.h"
 
 #include "param.h"
@@ -68,7 +67,7 @@ TP yields_code (TP mp)
 /* 2nd def of same name at same level */
 
 static
-bool def2nd(TP old, TP new, bool init)	/* prototyping: herzien */
+bool def2nd(TP old, TP new)	/* prototyping: herzien */
 {
 	short osc, nsc, reason;
 	TP pt, tp = new->type, op = old->type;
@@ -78,7 +77,6 @@ bool def2nd(TP old, TP new, bool init)	/* prototyping: herzien */
 	pt = yields_code(tp);
 
 	reason = similar_type(0, 1, op, tp, pt ne 0, 0);
-
 	if (reason eq 0)
 	{
 		if (    osc eq ENUM
@@ -135,10 +133,8 @@ bool def2nd(TP old, TP new, bool init)	/* prototyping: herzien */
 	    or (pt eq nil and reason eq 0)
 	   )
 	{
-		if ( osc eq PROT   )
+		if (osc eq PROT)
 		{
-			old->sc = PROT_USED;	/* prototype node used:
-									   to prevent 2nd def of body */
 			if (tp->tflgs.f.old_args)
 /* make inernal name so calls are matched against prototype.
  * We cannot free the node because it is a body definition.
@@ -158,40 +154,46 @@ bool def2nd(TP old, TP new, bool init)	/* prototyping: herzien */
 		}
 	}
 
+#if 1 /* C_DEBUG */
 	errorn(new, "[%d]bad second declaration of", reason);
+#else
+	errorn(new, "Bad second declaration of");
+#endif
 	/* use 2nd def so other stuff works */
 	return true;  /* put in front of list */
 }
 
 global
-bool loc_sym(TP xp, bool context)
+void loc_sym(TP xp)	/* 12'19 HR: v6 void function */
 {
 	TP old;
 
-	if (xp eq nil)
-		return false;
-	if (xp->type and is_op(xp->type))
-		putt_lifo(xp->type->token eq K_OP ? &G.scope->b_ops : &G.scope->b_casts, xp);
-	else
+	if (xp)
 	{
-	/* put in table */
-	/* later look for previous definition */
-		old = tlook(G.scope->b_syms, xp);
-		if (old eq nil or def2nd(old, xp, context ))
+		if (xp->type and xp->type->tflgs.f.old_args)
 			putt_lifo(&G.scope->b_syms, xp);
+		elif (xp->type and is_op(xp->type))
+			putt_lifo(xp->type->token eq K_OP ? &G.scope->b_ops : &G.scope->b_casts, xp);
+		else
+		{
+		/* put in table */
+		/* later look for previous definition */
+			old = tlook(G.scope->b_syms, xp);
+			if (   old eq nil
+			    or def2nd(old, xp)
+			   )
+				putt_lifo(&G.scope->b_syms, xp);
+		}
 	}
-	return true;
 }
 
 /* put in listpp */
 global
-bool list_sym(TP *list, TP xp)
+void list_sym(TP *list, TP xp)
 {
-	if (xp eq nil)
-		return false;
-	/* put in table */
-	putt_lifo(list, xp);
-	return true;
+	if (xp)
+		/* put in table */
+		putt_lifo(list, xp);
 }
 
 /* assemble decl and put in table */
@@ -202,7 +204,6 @@ short pdb_scope(short scope)
 	switch (scope)
 	{
 		case PROT:
-		case PROT_USED:
 		case K_EXTERN:
 			return -1;
 	}
@@ -212,15 +213,19 @@ short pdb_scope(short scope)
 void pt(TP tp, Cstr s)
 {
 	if (strncmp(tp->name, "weiter", 6) eq 0)
-		message(0,0,"%s %s", s, tp->name);
+		message("%s %s", s, tp->name);
 }
 
 global
-void globl_sym(TP xp, bool context)
+void globl_sym(TP xp)
 {
 	if (xp)
 	{
 		TP old;
+#if C_DEBUG
+		if (xp->type and xp->type->xflgs.f.pasc)
+			messagen(xp,"pascal symbol");
+#endif
 
 		if (xp->type and is_op(xp->type))
 			putt_lifo(xp->type->token eq K_OP ? &G.optab : &G.casttab, xp);
@@ -230,7 +235,9 @@ void globl_sym(TP xp, bool context)
 		/* later look for previous definition */
 			short h = hash(xp->name);
 			old = tlook(symtab[h], xp);
-			if (old eq nil or def2nd(old, xp, context) )
+			if (   old eq nil
+			    or def2nd(old, xp)
+			   )
 			{
 #if NODESTATS
 				G.symbols++;
@@ -263,13 +270,13 @@ static
 void spr(short id, short lvl, TP a, TP b)
 {
 	if (id eq 6)
-	message(0,0,"[%d,%d]%lx,%lx\t%s,%s", id, lvl,
-				a,
-				b,
-				a->name ? a->name : "œœœ",
-				b->name ? b->name : "œœœ" /* ,
-				pdb_file_by_number(auto_dependencies, a->fileno),
-				pdb_file_by_number(auto_dependencies, b->fileno) */
+	message("[%d,%d]%lx,%lx\t%s,%s", id, lvl,
+			a,
+			b,
+			a->name ? a->name : "œœœ",
+			b->name ? b->name : "œœœ" /* ,
+			pdb_file_by_number(auto_dependencies, a->fileno),
+			pdb_file_by_number(auto_dependencies, b->fileno) */
 		    ),
 	bios(2,2);
 }
@@ -561,7 +568,6 @@ etc
 static
 void enum_decls(bool bits)
 {
-	short context = 0;
 	TP head, xp;
 	long curval = bits ? 1 : 0;
 
@@ -579,9 +585,9 @@ void enum_decls(bool bits)
 			xp->type = basic_type(icon_ty((NP)xp), 1);     /* final type */
 
 			if (G.prtab->level)
-				loc_sym(xp, context);
+				loc_sym(xp);
 			else
-				globl_sym(xp, context);
+				globl_sym(xp);
 		}
 
 		if (bits)
@@ -900,7 +906,7 @@ TP Declarer(bool loc, short *dclass, short *sclass, bool *declty)
 			othw
 				rv = derived_type(declty);	/* look for 'struct', 'union', 'enum', proc' 'gref' or typedef names */
 				see = rv ne 0;				/* enum returns default_type(-1, 0) in rv */
-				if (see and is_basic(rv) /* rv->nflgs.f.bas */)
+				if (see and is_basic(rv))
 				{
 					c = rv->token;
 					b = c; 	/*	want to het rid of t_to_k!!!! */
@@ -952,7 +958,7 @@ TP Declarer(bool loc, short *dclass, short *sclass, bool *declty)
 	if (qual)
 	{
 		un_q(rv);				/* 01'15 v5.2 */
-		rv = qualify_type(rv, qual, 0, 0);	/* This is the only call (besides the calls to itself) v5.2 improved*/
+		rv = qualify_type(rv, qual);	/* This is the only call (besides the calls to itself) v5.2 improved*/
 	}
 
 	return rv;
@@ -964,7 +970,6 @@ TP Declarer(bool loc, short *dclass, short *sclass, bool *declty)
 global
 bool loc_decls(void)			/* called from body.c */
 {
-	short context = 0;
 	TP head, xp;
 	short sclass;
 	bool rv = 0, iscomma, declty;
@@ -995,18 +1000,18 @@ bool loc_decls(void)			/* called from body.c */
 					{
 #if FOR_A && LOC_PROC 			/* No local proc's for now: problems with register usage */
 						if (!(cur->token eq COMMA or cur->token eq ENDS))
-							tp->cflgs.f.cdec = 1, loc_proc(xp, L_PROC);
+							tp->xflgs.f.cdec = 1, loc_proc(xp, L_PROC);
 						else
 #endif
 						{
 							if (xp->sc ne K_TYPE)	/* local typedef proc's */
 								xp->sc = PROT;
-							loc_sym(xp, context);
+							loc_sym(xp);
 						}
 					othw
 						if (tp->list)		/* old args with decls */
 							warnn(xp, "current C does not support local procedures");
-						loc_sym(xp, context);
+						loc_sym(xp);
 					}
 				othw
 					NP ap = nil;
@@ -1030,7 +1035,7 @@ bool loc_decls(void)			/* called from body.c */
 									loc_size(gp, xp, &G.scope->b_size,
 												     &G.scope->b_regs);
 							}
-							loc_sym(xp, context);
+							loc_sym(xp);
 						}
 						elif (      (   xp->sc eq K_AUTO
 							         or xp->sc eq K_REG
@@ -1113,7 +1118,7 @@ bool loc_decls(void)			/* called from body.c */
 											    	     &G.scope->b_regs);
 								loc_advice(xp, gpbase);
 							}
-							loc_sym(xp, context);
+							loc_sym(xp);
 						}
 					}
 					out_gp();
@@ -1290,14 +1295,14 @@ TP B_follow(TP np)
 			else
 				np->aflgs.f.np = 1;
 			return np;
-*/		case FLO:
+		case FLO:
 			fadvnode();
 			if (np->aflgs.f.nf)
 				spur(np, FLO);
 			else
 				np->aflgs.f.nf = 1;
 			return np;
-		}
+*/		}
 	}
 
 	return nil;
@@ -1490,9 +1495,10 @@ static
 NP check_syscall(NP np)
 {
 	NP e1 = np;
+
 	if (np)
 	{
-		form_types(np, FORSIDE, 0);		/* constant & enum folding */
+		form_types(np, FORSIDE,0);		/* constant & enum folding */
 		if (np->token eq ICON)			/* (n) */
 			if (np->val.i < 0 or np->val.i > 15)
 				e1 = nil;
@@ -1549,7 +1555,64 @@ TP declarator(void)
 		}
 
 
-#include "pmod.h"		/* handle function modifiers */
+	if (cur->cat0 & PMOD)		/* cdecl, pascal, __asm__, __syscall__, etc. */
+	{
+		short tok = cur->token;
+		fadvnode();
+		switch (tok)
+		{
+		case K_CDECL:
+			e1 = declarator();
+			kp = yields_ty(e1, T_PROC);
+			if (kp)
+				kp->xflgs.f.cdec = 1;
+			else
+				warn_func_modifier(e1, tok);
+			return e1;
+		case K_PAS:
+			e1 = declarator();
+			kp = yields_ty(e1, T_PROC);
+			if (kp)
+			{
+				kp->xflgs.f.cdec = 1;	/* pascal implies cdecl !! */
+				kp->xflgs.f.pasc = 1;	/* 09'19 HR: v6 correct pascal behaviour */
+			}
+			else
+				warn_func_modifier(e1, tok);
+
+			return e1;
+#if BIP_ASM
+		case K_ASM:
+			e1 = declarator();
+			kp = yields_ty(e1, T_PROC);
+			if (kp)
+				kp->tflgs.f.asm_func = 1;
+			else
+				warn_func_modifier(e1, tok);
+			return e1;
+#endif
+		case K_SYSC:				/* __syscall__ (currentlly used for generating trap instruction) */
+			e2 = get_expr();
+			e2 = check_syscall(e2);
+			e1 = declarator();
+			if (e1 eq nil or (e1 and e1->token ne T_PROC))
+				warn_func_modifier(e1, tok);
+			elif (e2)
+			{
+				if (e2->token eq ICON)
+					e1->fld.offset = e2->val.i,
+					e1->lbl  = -1;
+				else
+					e1->fld.offset = e2->left ->val.i,
+					e1->lbl  = e2->right->val.i;
+				e1->xflgs.f.sysc = 1;
+				freenode(e2);
+			}
+
+
+			return e1;
+		}
+	}
 
 	switch (cur->token)
 	{
@@ -1584,7 +1647,7 @@ TP declarator(void)
 		{
 			kp = yields_ty(e1, T_PROC);
 			if (kp)
-				kp->cflgs.f.cdec = 1;
+				kp->xflgs.f.cdec = 1;
 			else
 				warn_func_modifier(e1, K_CDECL);
 		}

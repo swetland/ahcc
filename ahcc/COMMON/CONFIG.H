@@ -66,6 +66,7 @@ typedef struct
 		tabber;
 #endif
 
+	bool s;			/* use clipboard in stead of private copy/paste buffer (BUFF), and see below. */
 	bool a;			/* Autosave settings (at the end because its always there)(initializations last comma not needed) */
 } CONFIG;
 
@@ -79,10 +80,6 @@ void	opt_to_cfg	(OpEntry *tab,short ob, short db, OBJECT *otree, OBJECT *mtree);
 void	radio_to_cfg(OpEntry *tab,short ob, short db, OBJECT *otree);
 OpEntry *findopt	(OpEntry *tab,short ob, short db);
 void	options		(OpEntry *tab,bool set);
-bool	loadconfig	(FILE *f,OpEntry *tab, short lvl);
-void	saveconfig	(FILE *f,OpEntry *tab, short lvl);
-void	changeconfig(OpEntry *tab, void *old, void *new);
-OpEntry *copyconfig	(OpEntry *tab, void *old, void *new);
 void	listsets	(OpEntry *tab);
 char *	crlf		(char *f);
 char *	cfgname		(void);

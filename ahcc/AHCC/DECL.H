@@ -29,12 +29,11 @@ TP
 BpV		loc_decls,
 		is_ty_start;
 
-BpTB 	loc_sym;
 IpT		dot_sym;
 
-VpTB	globl_sym;
+VpT 	loc_sym, globl_sym;
 
-bool	list_sym	(TP *list, TP xp);
+void	list_sym	(TP *list, TP xp);
 
 TP 		ok_decl_A	(TP e1, TP head, short dty);
 TP 		Declare_A	(TP e1, TP head);
